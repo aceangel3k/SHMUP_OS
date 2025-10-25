@@ -1,6 +1,0 @@
-# Ignore all cached images
-images/
-
-# But keep this directory structure
-!.gitignore
-!README.md
