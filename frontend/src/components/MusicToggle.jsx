@@ -96,19 +96,22 @@ export default function MusicToggle({ youtubeUrl = 'https://www.youtube.com/watc
       
       // Only autoplay if user hasn't explicitly turned it off
       if (saved !== 'true') {
-        console.log('Attempting to unmute and play music...');
+        console.log('Attempting to unmute and play music from beginning...');
         setTimeout(() => {
           if (playerRef.current) {
             try {
+              // Restart video from beginning
+              playerRef.current.seekTo(0);
               playerRef.current.unMute();
               playerRef.current.setVolume(50);
+              playerRef.current.playVideo();
               const state = playerRef.current.getPlayerState();
               const volume = playerRef.current.getVolume();
               const isMutedCheck = playerRef.current.isMuted();
               console.log('Player state after unmute:', { state, volume, isMuted: isMutedCheck });
               setIsMuted(false);
               hasAutoPlayed.current = true;
-              console.log('Music unmuted and playing at 50% volume');
+              console.log('Music restarted from beginning and playing at 50% volume');
             } catch (error) {
               console.error('Error unmuting player:', error);
             }
