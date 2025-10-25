@@ -71,6 +71,16 @@ body {
   color: #06080A;
 }
 
+.tui-button.difficulty-selected {
+  background-color: #00FFD1 !important;
+  color: #06080A !important;
+}
+
+.tui-button.difficulty-selected:hover {
+  background-color: #00FFD1 !important;
+  color: #06080A !important;
+}
+
 .tui-button:focus {
   outline: none;
   box-shadow: 0 0 0 2px #00FFD1;

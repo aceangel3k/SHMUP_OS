@@ -106,7 +106,7 @@ export default function PromptScreen({ onSubmit, initialPrompt = '', initialDiff
             </span>
           </label>
 
-          <label className="block mb-6">
+          <div className="block mb-6">
             <span className="font-mono block mb-2" style={{ color: '#00FFD1' }}>
               &gt; SELECT DIFFICULTY:
             </span>
@@ -119,11 +119,8 @@ export default function PromptScreen({ onSubmit, initialPrompt = '', initialDiff
                     triggerFlash(`diff-${diff}`);
                     setDifficulty(diff);
                   }}
-                  className="tui-button flex-1"
+                  className={`tui-button flex-1 ${difficulty === diff ? 'difficulty-selected' : ''}`}
                   style={{
-                    ...(difficulty === diff
-                      ? { backgroundColor: '#00FFD1', color: '#06080A' }
-                      : {}),
                     ...(flashingButton === `diff-${diff}`
                       ? { 
                           animation: 'strobe 0.1s linear infinite',
@@ -137,7 +134,7 @@ export default function PromptScreen({ onSubmit, initialPrompt = '', initialDiff
                 </button>
               ))}
             </div>
-          </label>
+          </div>
 
           <button
             type="submit"
