@@ -11,6 +11,7 @@ export default function BootSequence({ onComplete, onLogoShow }) {
   const [logoOpacity, setLogoOpacity] = useState(0);
   const [logoStrobing, setLogoStrobing] = useState(false);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
+  const [showContinuePrompt, setShowContinuePrompt] = useState(false);
 
   const bootMessages = [
     'Initializing SHMUP OS Engine v2.0...',
@@ -56,41 +57,72 @@ export default function BootSequence({ onComplete, onLogoShow }) {
 
   useEffect(() => {
     if (showLogo) {
-      // Trigger music autoplay when logo shows
-      if (onLogoShow) {
-        onLogoShow();
-      }
+      // Don't trigger music yet - wait for user interaction
+      console.log('Logo showing');
       
       // Start with opacity 0, then fade in after a brief delay
-      // This ensures the transition actually happens
       const fadeInTimer = setTimeout(() => {
         setLogoOpacity(1);
       }, 100);
 
-      // Start strobing after fade in completes
-      const strobeTimer = setTimeout(() => {
-        setLogoStrobing(true);
-      }, 1500); // Start strobe after 1.5s (after fade in)
-
-      // Stop strobing and start fade out
-      const stopStrobeTimer = setTimeout(() => {
-        setLogoStrobing(false);
-        setLogoOpacity(0);
-      }, 3000); // Strobe for 1.5s
-
-      // Complete boot sequence after fade out
-      const completeTimer = setTimeout(() => {
-        onComplete();
-      }, 4500); // Total: 1.5s fade in + 1.5s strobe + 1.5s fade out
+      // Show continue prompt after fade in completes
+      const promptTimer = setTimeout(() => {
+        setShowContinuePrompt(true);
+      }, 1600); // Show prompt after fade in
 
       return () => {
         clearTimeout(fadeInTimer);
-        clearTimeout(strobeTimer);
-        clearTimeout(stopStrobeTimer);
-        clearTimeout(completeTimer);
+        clearTimeout(promptTimer);
       };
     }
-  }, [showLogo, onComplete, onLogoShow]);
+  }, [showLogo, onLogoShow]);
+
+  // Handle user interaction to continue
+  useEffect(() => {
+    if (!showContinuePrompt) return;
+
+    const handleInteraction = () => {
+      // Remove event listeners immediately to prevent multiple triggers
+      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('click', handleClick);
+      
+      // Trigger music autoplay on user interaction
+      console.log('User interaction detected, triggering music autoplay');
+      if (onLogoShow) {
+        onLogoShow();
+      }
+      
+      // Start strobe effect (keep continue prompt visible)
+      setLogoStrobing(true);
+      
+      // Stop strobe and fade out after 1.5s
+      setTimeout(() => {
+        setLogoStrobing(false);
+        setLogoOpacity(0);
+        
+        // Complete after fade out
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
+      }, 1500);
+    };
+
+    const handleKeyPress = (e) => {
+      handleInteraction();
+    };
+
+    const handleClick = () => {
+      handleInteraction();
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    window.addEventListener('click', handleClick);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      window.removeEventListener('click', handleClick);
+    };
+  }, [showContinuePrompt, onComplete]);
 
   return (
     <div
@@ -180,6 +212,19 @@ export default function BootSequence({ onComplete, onLogoShow }) {
           >
             ▓▒░ AI-Generated Shoot-'em-up ░▒▓
           </p>
+          {showContinuePrompt && (
+            <p
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '16px',
+                color: '#00FFD1',
+                marginTop: '48px',
+                animation: 'blink 1.5s infinite',
+              }}
+            >
+              Press any key or click to continue...
+            </p>
+          )}
         </div>
       )}
 

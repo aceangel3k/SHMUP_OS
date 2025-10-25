@@ -6,11 +6,12 @@
 import { useState, useEffect, useRef } from 'react';
 
 export default function MusicToggle({ youtubeUrl = 'https://www.youtube.com/watch?v=lujByXyoUew', autoplay = false }) {
-  // Check localStorage for saved preference, default to muted
+  // Check localStorage for saved preference, default to unmuted for new visitors
   const [isMuted, setIsMuted] = useState(() => {
     const saved = localStorage.getItem('musicMuted');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
+  const [playerReady, setPlayerReady] = useState(false);
   const playerRef = useRef(null);
   const iframeRef = useRef(null);
   const hasAutoPlayed = useRef(false);
@@ -53,8 +54,12 @@ export default function MusicToggle({ youtubeUrl = 'https://www.youtube.com/watc
         },
         events: {
           onReady: (event) => {
-            event.target.mute(); // Start muted
+            console.log('YouTube player ready');
+            setPlayerReady(true);
+            // Start muted to comply with browser autoplay policies
+            event.target.mute();
             event.target.playVideo();
+            console.log('Player started (muted)');
           },
           onStateChange: (event) => {
             // Loop video when it ends
@@ -81,19 +86,39 @@ export default function MusicToggle({ youtubeUrl = 'https://www.youtube.com/watc
     };
   }, []); // Empty dependency array - only run once on mount
 
-  // Autoplay effect when autoplay prop changes
+  // Autoplay effect when autoplay prop changes and player is ready
   useEffect(() => {
-    if (autoplay && !hasAutoPlayed.current && playerRef.current) {
+    console.log('Autoplay effect triggered:', { autoplay, playerReady, hasAutoPlayed: hasAutoPlayed.current });
+    
+    if (autoplay && !hasAutoPlayed.current && playerReady && playerRef.current) {
       const saved = localStorage.getItem('musicMuted');
+      console.log('Checking autoplay conditions:', { saved, shouldAutoplay: saved !== 'true' });
+      
       // Only autoplay if user hasn't explicitly turned it off
       if (saved !== 'true') {
-        playerRef.current.unMute();
-        playerRef.current.setVolume(50);
-        setIsMuted(false);
-        hasAutoPlayed.current = true;
+        console.log('Attempting to unmute and play music...');
+        setTimeout(() => {
+          if (playerRef.current) {
+            try {
+              playerRef.current.unMute();
+              playerRef.current.setVolume(50);
+              const state = playerRef.current.getPlayerState();
+              const volume = playerRef.current.getVolume();
+              const isMutedCheck = playerRef.current.isMuted();
+              console.log('Player state after unmute:', { state, volume, isMuted: isMutedCheck });
+              setIsMuted(false);
+              hasAutoPlayed.current = true;
+              console.log('Music unmuted and playing at 50% volume');
+            } catch (error) {
+              console.error('Error unmuting player:', error);
+            }
+          }
+        }, 500);
+      } else {
+        console.log('User has explicitly muted music, not autoplaying');
       }
     }
-  }, [autoplay]);
+  }, [autoplay, playerReady]);
 
   const toggleMute = () => {
     if (playerRef.current) {
