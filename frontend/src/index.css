@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+:root {
+  font-family: 'Courier New', monospace;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: dark;
+  color: #00FFD1;
+  background-color: #06080A;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: #06080A;
+  border-left: 1px solid #00FFD1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00FFD1;
+  border: 2px solid #06080A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00FFFF;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* TUI/Terminal styling */
+.tui-border {
+  border: 2px solid #00FFD1;
+  box-shadow: 0 0 10px rgba(0, 255, 209, 0.3);
+}
+
+.tui-text {
+  color: #00FFD1;
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 5px rgba(0, 255, 209, 0.5);
+}
+
+.tui-button {
+  padding: 0.5rem 1rem;
+  border: 2px solid #00FFD1;
+  background-color: transparent;
+  color: #00FFD1;
+  font-family: 'Courier New', monospace;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.tui-button:hover {
+  background-color: #00FFD1;
+  color: #06080A;
+}
+
+.tui-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #00FFD1;
+}
+
+.tui-input {
+  padding: 0.5rem 1rem;
+  border: 2px solid #00FFD1;
+  background-color: #06080A;
+  color: #00FFD1;
+  font-family: 'Courier New', monospace;
+}
+
+.tui-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #00FFD1;
+}
+
+/* Scanline effect */
+.scanlines {
+  position: relative;
+}
+
+.scanlines::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+/* CRT glow */
+.crt-glow {
+  box-shadow: 
+    inset 0 0 50px rgba(0, 255, 209, 0.1),
+    0 0 20px rgba(0, 255, 209, 0.2);
+}
+
+/* Strobe flash animation */
+@keyframes strobe {
+  0%, 100% {
+    opacity: 1;
+    filter: brightness(2);
+  }
+  50% {
+    opacity: 0.3;
+    filter: brightness(0.5);
+  }
+}
