@@ -91,6 +91,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     const canvas = canvasRef.current;
     const difficultyScaling = new DifficultyScaling(difficulty);
     console.log(`🎮 Difficulty: ${difficulty}`, difficultyScaling.getModifiers());
+    console.log(`🎁 Power-up settings - Drop rate: ${(difficultyScaling.getPowerUpDropRate() * 100).toFixed(0)}%, Pity threshold: ${difficultyScaling.getPowerUpPityThreshold()}`);
     
     // Load assets asynchronously and wait before starting game
     const loadAssets = async () => {
@@ -317,11 +318,29 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     let isGameOver = false;
     let gameIsLocked = false; // Immediate synchronous lock
     
+    // Power-up pity system (difficulty-based)
+    let pickupPityCounter = 0; // Starts at 0, increments when no pickup drops
+    const PICKUP_PITY_THRESHOLD = difficultyScaling.getPowerUpPityThreshold(); // Difficulty-based threshold
+    const PICKUP_DROP_RATE = difficultyScaling.getPowerUpDropRate(); // Difficulty-based drop rate
+    
     console.log('🔄 Game state variables initialized for new game');
     
     // Initialize UI with difficulty-based values
     setLives(currentLives);
     setShields(currentShields);
+    
+    // Provide starting power-up to help players
+    setTimeout(() => {
+      const pickupDefs = gameData.pickups || [];
+      if (pickupDefs.length > 0 && currentPower < 3) {
+        // Prefer power-ups at start, but give other pickups if already powered up
+        const powerPickups = pickupDefs.filter(p => p.effect === 'power+1');
+        const availablePickups = powerPickups.length > 0 ? powerPickups : pickupDefs;
+        const def = availablePickups[Math.floor(Math.random() * availablePickups.length)];
+        pickupManager.spawn(150, GAME_CONFIG.RENDER_HEIGHT / 2, def);
+        console.log(`🎁 Starting power-up provided: ${def.effect}`);
+      }
+    }, 2000); // 2 seconds after game starts
     
     // Start input handling
     input.start();
@@ -568,11 +587,34 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
           currentKills++;
           setScore(currentScore);
           setKills(currentKills);
-          // Chance to drop a pickup
+          // Chance to drop a pickup with pity system
           const pickupDefs = gameData.pickups || [];
-          if (pickupDefs.length > 0 && Math.random() < 0.25) {
-            const def = pickupDefs[Math.floor(Math.random() * pickupDefs.length)];
-            pickupManager.spawn(enemyPos.x, enemyPos.y, def);
+          let pickupDropped = false;
+          
+          if (pickupDefs.length > 0) {
+            // Check if pity system should force a pickup
+            if (pickupPityCounter >= PICKUP_PITY_THRESHOLD) {
+              // Guaranteed pickup due to pity
+              const def = pickupDefs[Math.floor(Math.random() * pickupDefs.length)];
+              pickupManager.spawn(enemyPos.x, enemyPos.y, def);
+              pickupDropped = true;
+              pickupPityCounter = 0; // Reset pity counter
+              console.log(`🎁 PITY SYSTEM: Guaranteed power-up dropped after ${PICKUP_PITY_THRESHOLD} enemies (${difficulty} difficulty)!`);
+            } else if (Math.random() < PICKUP_DROP_RATE) {
+              // Difficulty-based random pickup chance
+              const def = pickupDefs[Math.floor(Math.random() * pickupDefs.length)];
+              pickupManager.spawn(enemyPos.x, enemyPos.y, def);
+              pickupDropped = true;
+            }
+          }
+          
+          // Increment pity counter if no pickup was dropped
+          if (!pickupDropped) {
+            pickupPityCounter++;
+            // Debug: Show pity counter progress
+            if (pickupPityCounter > 5 && pickupPityCounter % 3 === 0) {
+              console.log(`🎁 Pity counter: ${pickupPityCounter}/${PICKUP_PITY_THRESHOLD}`);
+            }
           }
         }
       }

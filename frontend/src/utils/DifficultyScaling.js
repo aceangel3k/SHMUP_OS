@@ -21,11 +21,13 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 0.8,  // 80% bullet speed
         waveCountMultiplier: 2.0,    // 2x enemies per wave
         shootCooldownMultiplier: 1.5, // 50% slower shooting (1.5x cooldown)
-        bossHpMultiplier: 0.7,       // 70% boss HP
-        playerDamageMultiplier: 1.3, // 30% more player damage
+        bossHpMultiplier: 15.0,      // 15x boss HP (much stronger boss for 15-20s fight)
+        playerDamageMultiplier: 1.0, // Normal player damage (easier mode already has advantage)
         bombDamageMultiplier: 1.2,   // 20% more bomb damage
         startingLives: 5,            // 5 lives
         startingShields: 2,          // 2 shields
+        powerUpDropRate: 0.35,       // 35% chance (more generous)
+        powerUpPityThreshold: 12,    // Pity after 12 enemies (more frequent)
       },
       normal: {
         enemyHpMultiplier: 1.0,
@@ -34,11 +36,13 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 1.0,
         waveCountMultiplier: 3.0,
         shootCooldownMultiplier: 1.0,
-        bossHpMultiplier: 1.0,
-        playerDamageMultiplier: 1.0,
+        bossHpMultiplier: 20.0,      // 20x boss HP (epic boss for 15-20s fight)
+        playerDamageMultiplier: 0.9, // 10% less player damage
         bombDamageMultiplier: 1.0,   // Normal bomb damage
         startingLives: 4,            // 4 lives
         startingShields: 1,          // 1 shield
+        powerUpDropRate: 0.25,       // 25% chance (standard)
+        powerUpPityThreshold: 15,    // Pity after 15 enemies (standard)
       },
       hard: {
         enemyHpMultiplier: 1.5,      // 50% more HP
@@ -47,11 +51,13 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 1.2,  // 20% faster bullets
         waveCountMultiplier: 5.0,    // 5x enemies per wave
         shootCooldownMultiplier: 0.7, // 30% faster shooting
-        bossHpMultiplier: 1.5,       // 50% more boss HP
-        playerDamageMultiplier: 0.8, // 20% less player damage
+        bossHpMultiplier: 25.0,      // 25x boss HP (legendary boss for 20+s fight)
+        playerDamageMultiplier: 0.7, // 30% less player damage (hard mode needs significant challenge)
         bombDamageMultiplier: 1.0,   // Normal bomb damage (hard mode)
         startingLives: 3,            // 3 lives
         startingShields: 0,          // 0 shields
+        powerUpDropRate: 0.15,       // 15% chance (more scarce)
+        powerUpPityThreshold: 20,    // Pity after 20 enemies (less frequent)
       },
     };
 
@@ -119,6 +125,27 @@ export class DifficultyScaling {
    */
   scaleBombDamage(baseDps) {
     return baseDps * (this.modifiers.bombDamageMultiplier || 1.0);
+  }
+
+  /**
+   * Scale bomb damage (DPS)
+   */
+  scaleBombDamage(baseDps) {
+    return baseDps * (this.modifiers.bombDamageMultiplier || 1.0);
+  }
+
+  /**
+   * Get power-up drop rate for current difficulty
+   */
+  getPowerUpDropRate() {
+    return this.modifiers.powerUpDropRate || 0.25;
+  }
+
+  /**
+   * Get power-up pity threshold for current difficulty
+   */
+  getPowerUpPityThreshold() {
+    return this.modifiers.powerUpPityThreshold || 15;
   }
 
   /**

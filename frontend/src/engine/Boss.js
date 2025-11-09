@@ -61,9 +61,9 @@ export class Boss {
     this.shootCooldownMultiplier = shootCooldownMultiplier;
     this.patternRotation = 0;
     
-    // Shooting at player
+    // Shooting at player - much more aggressive for longer fights
     this.shootTimer = 0;
-    this.shootCooldown = (1.5 + Math.random() * 0.5) * shootCooldownMultiplier; // 1.5-2.0s, scaled by difficulty
+    this.shootCooldown = (0.5 + Math.random() * 0.3) * shootCooldownMultiplier; // 0.5-0.8s, very fast shooting
     
     // Visual
     this.color = '#FF00FF'; // Magenta for boss
@@ -127,7 +127,7 @@ export class Boss {
       if (this.shootTimer >= this.shootCooldown) {
         this.shootAtPlayer(player, bulletManager);
         this.shootTimer = 0;
-        this.shootCooldown = (1.5 + Math.random() * 0.5) * this.shootCooldownMultiplier;
+        this.shootCooldown = (0.5 + Math.random() * 0.3) * this.shootCooldownMultiplier; // Very fast shooting for longer fights
       }
     }
     
@@ -168,8 +168,8 @@ export class Boss {
     const dy = player.y - this.y;
     const angle = Math.atan2(dy, dx);
     
-    // Spawn 3 bullets in a small spread aimed at player
-    const spreadAngles = [-0.15, 0, 0.15];
+    // Spawn 5 bullets in a wider spread aimed at player (more aggressive)
+    const spreadAngles = [-0.25, -0.125, 0, 0.125, 0.25];
     for (const spread of spreadAngles) {
       const finalAngle = angle + spread;
       bulletManager.spawnEnemyBullet(

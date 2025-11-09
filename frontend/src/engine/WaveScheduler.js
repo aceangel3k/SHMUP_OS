@@ -21,6 +21,7 @@ export class WaveScheduler {
     this.waveIndex = 0;
     this.isComplete = false;
     this.bossHasSpawned = false; // Simple flag: true once boss spawns, never spawn again
+    this.lastEnemyActiveTime = 0; // Track when the last threatening enemy was active
     if (typeof WaveScheduler.bossSpawnedGlobal === 'undefined') {
       WaveScheduler.bossSpawnedGlobal = false;
     }
@@ -240,18 +241,26 @@ export class WaveScheduler {
       const allEnemiesDefeated = threateningCount === 0;
       const totalActiveEnemies = this.enemies.filter(e => e.active).length;
       
-      // Calculate time since last wave was spawned
-      const lastWaveTime = this.waves.length > 0 ? this.waves[this.waves.length - 1].time : 0;
-      const timeSinceLastWave = this.currentTime - lastWaveTime;
+      // Update last enemy active time for backup spawn mechanism
+      if (threateningCount > 0) {
+        this.lastEnemyActiveTime = this.currentTime;
+      }
       
-      // Only spawn boss if all waves are complete AND no threatening enemies remain
-      // Give a 5 second breathing room after the last threatening enemy is gone (increased from 3)
-      const shouldSpawnBoss = allEnemiesDefeated && timeSinceLastWave >= 5;
+      // Only spawn boss if all waves are complete AND all threatening enemies are defeated
+      // No artificial time delay - spawn immediately when conditions are met
+      let shouldSpawnBoss = allEnemiesDefeated && this.waveIndex >= this.waves.length;
+      
+      // Backup mechanism: if all waves are complete and no threatening enemies have been active for 10 seconds
+      if (!shouldSpawnBoss && this.waveIndex >= this.waves.length && totalActiveEnemies === 0) {
+        const timeSinceLastEnemy = this.currentTime - this.lastEnemyActiveTime;
+        if (timeSinceLastEnemy >= 10) {
+          console.log(`🏆 Backup boss spawn triggered: all waves complete, no enemies active for ${timeSinceLastEnemy.toFixed(1)}s`);
+          shouldSpawnBoss = true;
+        }
+      }
       
       if (!allEnemiesDefeated) {
         console.log(`⏳ Waiting for ${threateningCount} threatening enemies to be cleared before boss spawn (all waves scheduled, ${totalActiveEnemies} total active)`);
-      } else if (timeSinceLastWave < 5) {
-        console.log(`⏳ All threatening enemies cleared! Waiting for boss spawn delay (${(5 - timeSinceLastWave).toFixed(1)}s remaining)`);
       } else if (shouldSpawnBoss) {
         console.log(`🏆 All waves completed and all threatening enemies cleared! Spawning boss...`);
         // Enter critical section to avoid race across instances/frames
@@ -610,6 +619,7 @@ export class WaveScheduler {
     this.currentTime = 0;
     this.waveIndex = 0;
     this.isComplete = false;
+    this.lastEnemyActiveTime = 0;
     WaveScheduler.bossSpawnedGlobal = false;
     WaveScheduler.bossSpawnInProgress = false;
   }
