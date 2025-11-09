@@ -38,6 +38,8 @@ export class Boss {
     this.targetX = x - 200; // Move to this position
     this.targetY = y;
     this.isMovingToPosition = true;
+    // Boss starts invulnerable while moving to position
+    this.isInvulnerable = true;
     
     // Vertical panning movement
     this.panSpeed = 80; // pixels per second
@@ -85,6 +87,9 @@ export class Boss {
         this.y += (dy / dist) * 100 * deltaTime;
       } else {
         this.isMovingToPosition = false;
+        // Boss becomes vulnerable once in position
+        this.isInvulnerable = false;
+        console.log(`👹 Boss #${this.id} is now vulnerable and ready to fight!`);
       }
     } else {
       // Vertical panning movement when in position
