@@ -31,60 +31,109 @@ export class WaveScheduler {
   
   /**
    * Expand base waves into more varied waves for longer gameplay
-   * Difficulty scaling: easy = 3 waves (base), normal = 6 waves (2x), hard = 9 waves (3x)
+   * Difficulty scaling: easy = x2, normal = x3, hard = x5 enemies per wave
    */
   expandWaves(baseWaves, difficultyScaling) {
     if (!baseWaves || baseWaves.length === 0) return [];
     
-    // Determine wave multiplier based on difficulty
-    let waveMultiplier = 2; // default (normal)
+    // Use the wave count multiplier from difficulty scaling
+    let waveCountMultiplier = 3.0; // default (normal)
     if (difficultyScaling) {
-      const difficulty = difficultyScaling.getDifficulty();
-      if (difficulty === 'easy') {
-        waveMultiplier = 1; // Just use base 3 waves
-      } else if (difficulty === 'hard') {
-        waveMultiplier = 3; // 9 waves total
-      }
+      waveCountMultiplier = difficultyScaling.modifiers.waveCountMultiplier || 3.0;
     }
     
     const expanded = [];
     const formations = ['v_wave', 'column', 'line', 'arc', 'circle', 'random'];
     const paths = ['straight', 'sine', 'seek', 'arc', 'spiral'];
     
-    // Generate waves based on difficulty multiplier
-    const targetWaves = baseWaves.length * waveMultiplier;
+    // Generate waves with difficulty-specific enemy counts
     let currentTime = 0;
     
-    for (let i = 0; i < targetWaves; i++) {
-      // Pick a base wave to vary
-      const baseWave = baseWaves[i % baseWaves.length];
+    for (let i = 0; i < baseWaves.length; i++) {
+      const baseWave = baseWaves[i];
       
-      // Time spacing: 5-8 seconds between waves
-      currentTime += 5 + Math.random() * 3;
+      // First wave appears quickly, then maintain constant enemy presence
+      if (i === 0) {
+        currentTime = 2; // First wave appears at 2 seconds
+      } else {
+        // Calculate timing to maintain constant enemies: reduce gap for larger waves
+        const baseGap = 2 + Math.random() * 2; // 2-4 seconds base gap
+        const enemyDensity = difficultyScaling?.modifiers.waveCountMultiplier || 3.0;
+        const densityAdjustment = Math.max(0, (enemyDensity - 2) * 0.5); // Reduce gap for higher difficulty
+        currentTime += baseGap - densityAdjustment;
+      }
       
-      // Vary formation and path occasionally
-      const useVariation = Math.random() < 0.4; // 40% chance to vary
-      const formation = useVariation ? 
-        formations[Math.floor(Math.random() * formations.length)] : 
-        baseWave.formation;
-      const path = useVariation ? 
-        paths[Math.floor(Math.random() * paths.length)] : 
-        baseWave.path;
+      // Apply difficulty scaling to enemy count
+      const count = difficultyScaling ?
+        difficultyScaling.scaleWaveCount(baseWave.count) :
+        baseWave.count;
       
-      // Gradually increase count as waves progress
-      const countMultiplier = 1 + (i / targetWaves) * 0.5; // Up to 50% more enemies
-      const count = Math.max(3, Math.min(15, Math.round(baseWave.count * countMultiplier)));
+      // Stagger large waves to prevent sprite overlapping
+      if (count > 8) {
+        // Split large waves into smaller staggered groups
+        const groupSize = Math.min(6, Math.ceil(count / 3)); // Groups of max 6 enemies
+        const numGroups = Math.ceil(count / groupSize);
+        
+        for (let g = 0; g < numGroups; g++) {
+          const groupTime = currentTime + g * 1.5; // 1.5 seconds between groups
+          const groupCount = g < numGroups - 1 ? groupSize : count - (g * groupSize);
+          
+          // Vary formation for each group
+          const formation = formations[Math.floor(Math.random() * formations.length)];
+          const path = paths[Math.floor(Math.random() * paths.length)];
+          
+          expanded.push({
+            time: Math.round(groupTime),
+            formation,
+            enemy_type: baseWave.enemy_type,
+            count: groupCount,
+            path,
+            isStaggeredGroup: true
+          });
+          
+          console.log(`🌊 Staggered group ${g + 1}/${numGroups}: ${groupCount} enemies at time ${groupTime.toFixed(0)}`);
+        }
+      } else {
+        // Small waves spawn normally but with varied formations
+        const useVariation = Math.random() < 0.4; // 40% chance to vary
+        const formation = useVariation ?
+          formations[Math.floor(Math.random() * formations.length)] :
+          baseWave.formation;
+        const path = useVariation ?
+          paths[Math.floor(Math.random() * paths.length)] :
+          baseWave.path;
+        
+        expanded.push({
+          time: Math.round(currentTime),
+          formation,
+          enemy_type: baseWave.enemy_type,
+          count,
+          path,
+          isStaggeredGroup: false
+        });
+        
+        console.log(`🌊 Wave ${i + 1}: ${count} enemies at time ${currentTime.toFixed(0)}`);
+      }
       
-      expanded.push({
-        time: Math.round(currentTime),
-        formation,
-        enemy_type: baseWave.enemy_type,
-        count,
-        path
-      });
+      // Add small filler waves between large groups to maintain constant enemy presence
+      if (i < baseWaves.length - 1 && Math.random() < 0.7) { // 70% chance for filler
+        const fillerTime = currentTime + 1.5 + Math.random() * 1.5; // 1.5-3 seconds after
+        const fillerCount = Math.max(2, Math.min(4, Math.round(count * 0.3))); // Small filler groups
+        
+        expanded.push({
+          time: Math.round(fillerTime),
+          formation: 'column', // Simple formation for filler
+          enemy_type: baseWave.enemy_type,
+          count: fillerCount,
+          path: 'straight',
+          isFiller: true
+        });
+        
+        console.log(`🌊 Filler wave: ${fillerCount} enemies at time ${fillerTime.toFixed(0)}`);
+      }
     }
     
-    console.log(`🌊 Expanded ${baseWaves.length} base waves into ${expanded.length} varied waves`);
+    console.log(`🌊 Generated ${expanded.length} total waves with difficulty ${difficultyScaling?.getDifficulty() || 'normal'} (including staggered groups and filler waves)`);
     return expanded;
   }
   
@@ -106,23 +155,52 @@ export class WaveScheduler {
       }
     }
     
-    // Update all enemies
+    // Update all enemies and track their age
     for (const enemy of this.enemies) {
       if (enemy.active) {
         enemy.update(deltaTime, player, pathFunctions, bulletManager);
+        // Track enemy age for cleanup purposes
+        enemy.age = (enemy.age || 0) + deltaTime;
       }
     }
     
-    // Clean up inactive enemies
+    // Clean up inactive and stuck enemies
     const beforeCount = this.enemies.length;
-    this.enemies = this.enemies.filter(e => e.active);
+    
+    // Remove inactive enemies and enemies that have been alive too long (potentially stuck)
+    this.enemies = this.enemies.filter(enemy => {
+      // Remove clearly inactive enemies
+      if (!enemy.active) return false;
+      
+      // Remove enemies that have been alive for too long (45 seconds max)
+      const enemyAge = enemy.age || 0;
+      if (enemyAge > 45) {
+        console.log(`🧹 Removing stuck enemy (age: ${enemyAge.toFixed(1)}s)`);
+        enemy.active = false;
+        return false;
+      }
+      
+      // Remove enemies that are too far off-screen and not moving back
+      const margin = 200;
+      const isFarOffScreen = enemy.x < -margin || enemy.x > GAME_CONFIG.RENDER_WIDTH + margin ||
+                           enemy.y < -margin || enemy.y > GAME_CONFIG.RENDER_HEIGHT + margin;
+      
+      if (isFarOffScreen && enemyAge > 10) {
+        console.log(`🧹 Removing distant enemy (age: ${enemyAge.toFixed(1)}s, pos: ${enemy.x.toFixed(0)},${enemy.y.toFixed(0)})`);
+        enemy.active = false;
+        return false;
+      }
+      
+      return true;
+    });
+    
     const afterCount = this.enemies.length;
     
     if (beforeCount !== afterCount) {
-      console.log(`🧹 Cleaned up ${beforeCount - afterCount} dead enemies (${afterCount} remaining)`);
+      console.log(`🧹 Cleaned up ${beforeCount - afterCount} dead/stuck enemies (${afterCount} remaining)`);
     }
     
-    // Boss spawn: after all waves are scheduled, spawn only when all regular enemies are dead
+    // Boss spawn: after all waves are completed AND all enemies are defeated
     if (
       !this.bossHasSpawned &&
       !WaveScheduler.bossSpawnedGlobal &&
@@ -131,15 +209,24 @@ export class WaveScheduler {
       this.waveIndex >= this.waves.length &&
       !this.boss
     ) {
-      const allEnemiesDead = this.enemies.every(e => !e.active);
+      // Check if all enemies are defeated
+      const allEnemiesDefeated = this.enemies.every(e => !e.active);
       const activeEnemyCount = this.enemies.filter(e => e.active).length;
       
-      if (activeEnemyCount > 0) {
-        console.log(`⏳ Waiting for ${activeEnemyCount} enemies to die before boss spawn`);
-      }
-
-      if (allEnemiesDead) {
-        console.log('🏆 All enemies defeated! Spawning boss...');
+      // Calculate time since last wave was spawned
+      const lastWaveTime = this.waves.length > 0 ? this.waves[this.waves.length - 1].time : 0;
+      const timeSinceLastWave = this.currentTime - lastWaveTime;
+      
+      // Only spawn boss if all waves are complete AND all enemies are defeated
+      // Give a 3 second breathing room after the last enemy is defeated
+      const shouldSpawnBoss = allEnemiesDefeated && timeSinceLastWave >= 3;
+      
+      if (!allEnemiesDefeated) {
+        console.log(`⏳ Waiting for ${activeEnemyCount} enemies to be defeated before boss spawn (all waves scheduled)`);
+      } else if (timeSinceLastWave < 3) {
+        console.log(`⏳ All enemies defeated! Waiting for boss spawn delay (${(3 - timeSinceLastWave).toFixed(1)}s remaining)`);
+      } else if (shouldSpawnBoss) {
+        console.log(`🏆 All waves completed and all enemies defeated! Spawning boss...`);
         // Enter critical section to avoid race across instances/frames
         WaveScheduler.bossSpawnInProgress = true;
 
@@ -154,7 +241,7 @@ export class WaveScheduler {
           this.boss = new Boss(this.bossData, startX, startY, shootCooldownMultiplier);
           this.bossHasSpawned = true;
           WaveScheduler.bossSpawnedGlobal = true;
-          console.log(`👹 Boss spawned: ${this.bossData.name} at (${startX}, ${startY})`);
+          console.log(`👹 Boss spawned: ${this.bossData.name || 'Unknown'} at (${startX}, ${startY})`);
         }
 
         // Leave critical section

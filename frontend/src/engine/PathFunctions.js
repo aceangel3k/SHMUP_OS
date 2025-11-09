@@ -29,6 +29,12 @@ export const PathFunctions = {
       return;
     }
     
+    // Don't seek if too far left or if been seeking too long
+    if (enemy.x < 200 || t > 10) {
+      enemy.x -= enemy.speed * (1 / 60);
+      return;
+    }
+    
     const playerPos = player.getPosition();
     const dx = playerPos.x - enemy.x;
     const dy = playerPos.y - enemy.y;
@@ -46,7 +52,7 @@ export const PathFunctions = {
   arc: (enemy, t) => {
     const radius = 100;
     const speed = 2;
-    enemy.x = enemy.startX - t * enemy.speed * 0.5;
+    enemy.x = enemy.startX - t * enemy.speed * 0.5 - 50; // Always move left
     enemy.y = enemy.startY + Math.sin(t * speed) * radius;
   },
   
@@ -93,10 +99,10 @@ export const PathFunctions = {
     
     if (enemy.x > targetX) {
       enemy.x -= enemy.speed * (1 / 60);
-    } else {
-      // Hover with slight vertical movement
-      enemy.y = enemy.startY + Math.sin(t * 3) * 10;
+    } else if (t > 5) { // After 5 seconds of hovering, move left
+      enemy.x -= enemy.speed * (1 / 60);
     }
+    enemy.y = enemy.startY + Math.sin(t * 3) * 10;
   },
 };
 

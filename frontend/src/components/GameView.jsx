@@ -39,6 +39,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
   const [kills, setKills] = useState(0);
   const [lives, setLives] = useState(3);
   const [shields, setShields] = useState(0);
+  const [charge, setCharge] = useState(100);
   const [showBootLog, setShowBootLog] = useState(false);
   const [showBossWarning, setShowBossWarning] = useState(false);
   const [bossName, setBossName] = useState('');
@@ -236,6 +237,13 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         damage: difficultyScaling.scalePlayerDamage(gameData.weapons[0].damage)
       } : null;
       const weaponSystem = new WeaponSystem(bulletManager, weaponData, accentColor);
+      
+      // Set up power level change callback to update UI immediately
+      weaponSystem.onPowerLevelChange = (newLevel) => {
+        currentPower = newLevel;
+        setPower(newLevel);
+        console.log(`🔫 UI synchronized: Power level changed to ${newLevel}`);
+      };
       const bombSystem = new BombSystem(bulletManager);
       const collisionManager = new CollisionManager();
       const waveScheduler = new WaveScheduler(gameDataWithSprites, enemyDataMap, difficultyScaling);
@@ -329,16 +337,6 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         return;
       }
       
-      // Immediate synchronous lock check - takes effect instantly (after death sequence)
-      if (gameIsLocked) return;
-      
-      // Atomic game state check - stop everything if not playing
-      if (gameState !== 'playing') return;
-      
-      // Stop ALL updates if game is over or won
-      if (isGameOver) return;
-      if (hasWon) return;
-      
       // Check for boss spawn and victory FIRST (before any other logic)
       const boss = waveScheduler.getBoss();
       
@@ -346,13 +344,12 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       if (
         boss &&
         !bossSpawnedFlag &&
-        boss.name &&
         boss.active &&
-        boss.isMovingToPosition === false &&
-        (boss.spriteLoaded || boss.sprite)
+        boss.isMovingToPosition === false
       ) {
+        console.log(`🚨 Boss warning conditions met: name=${boss.name || 'Unknown'}, active=${boss.active}, moving=${boss.isMovingToPosition}, spriteLoaded=${boss.spriteLoaded || boss.sprite}`);
         bossSpawnedFlag = true;
-        setBossName(boss.name);
+        setBossName(boss.name || 'Boss'); // Use 'Boss' as fallback for empty/unknown names
         setShowBossWarning(true);
         soundSystem.playBossWarning();
       }
@@ -361,7 +358,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       if (boss && bossSpawnedFlag && boss.isDead && !boss.active && !hasWon) {
         hasWon = true;
         isGameOver = true; // Prevent any further collision checks
-        console.log('🎉 VICTORY - Boss defeated!');
+        console.log(`🎉 VICTORY - Boss defeated! Boss name: ${boss.name || 'Unknown'}. State transition to victory screen.`);
         
         // Boss explosion effect
         particleSystem.createBossExplosion(boss.x, boss.y);
@@ -372,11 +369,34 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         renderer.stop();
         input.stop();
         
-        // Show victory screen immediately
+        // Show victory screen immediately with force update
+        console.log('🎮 Setting game state to victory');
         setGameState('victory');
+        
+        // Force immediate UI update as backup
+        setTimeout(() => {
+          console.log('🎮 Forced victory screen update');
+          setGameState('victory');
+        }, 100);
+        
+        // Additional backup with longer delay
+        setTimeout(() => {
+          console.log('🎮 Secondary forced victory screen update');
+          setGameState('victory');
+        }, 500);
         
         return; // Stop updating this frame
       }
+      
+      // Immediate synchronous lock check - takes effect instantly (after death sequence)
+      if (gameIsLocked) return;
+      
+      // Atomic game state check - stop everything if not playing
+      if (gameState !== 'playing') return;
+      
+      // Stop ALL updates if game is over or won
+      if (isGameOver) return;
+      if (hasWon) return;
       
       // Helper: apply pickup effect
       const applyPickupEffect = (effect) => {
@@ -395,11 +415,15 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
             setPower(currentPower);
             soundSystem.playPickup?.();
             
+            // Refill charge on power-up
+            weaponSystem.refillCharge();
+            setCharge(100);
+            
             // Visual feedback for power-up
             const playerPos = player.getPosition();
             particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFF00', 20, 1.0);
             renderer.flash(0.3, '#FFFF00');
-            console.log(`⚡ Power increased to level ${currentPower}!`);
+            console.log(`⚡ Power increased to level ${currentPower}! Charge refilled!`);
           }
         } else if (typeof effect === 'string' && effect.startsWith('score+')) {
           const n = parseInt(effect.split('+')[1] || '0', 10);
@@ -446,11 +470,17 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       player.update(deltaTime);
       weaponSystem.update(deltaTime, player, actions.fire);
       
-      // Update weapon system when power changes
+      // Update weapon system when power changes (only if different to avoid loops)
       if (weaponSystem.currentPowerLevel !== currentPower) {
         weaponSystem.upgrade(currentPower);
         weaponSystem.currentPowerLevel = currentPower;
         console.log(`🔫 Weapon upgraded to power level ${currentPower}`);
+      }
+      
+      // Update weapon charge display
+      const currentCharge = weaponSystem.getChargeLevel();
+      if (currentCharge !== charge) {
+        setCharge(currentCharge);
       }
       bulletManager.update(deltaTime, GAME_CONFIG.RENDER_WIDTH, GAME_CONFIG.RENDER_HEIGHT);
       bombSystem.update(deltaTime);
@@ -502,7 +532,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       }
       
       // Bullet-enemy collisions
-      const bulletHits = collisionManager.checkBulletEnemyCollisions(bulletManager, activeEnemies);
+      const bulletHits = collisionManager.checkBulletEnemyCollisions(bulletManager, activeEnemies, GAME_CONFIG.RENDER_WIDTH, GAME_CONFIG.RENDER_HEIGHT);
       for (const hit of bulletHits) {
         const destroyed = hit.enemy.takeDamage(hit.bullet.damage);
         const enemyPos = hit.enemy.getPosition();
@@ -530,20 +560,6 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         }
       }
       
-      // Check victory immediately if boss died from bullet hit
-      const bossCheck = waveScheduler.getBoss();
-      if (bossCheck && bossSpawnedFlag && bossCheck.isDead && !bossCheck.active && !hasWon) {
-        hasWon = true;
-        isGameOver = true;
-        console.log('🎉 VICTORY - Boss defeated!');
-        particleSystem.createBossExplosion(bossCheck.x, bossCheck.y);
-        renderer.flash(0.8, '#FFFFFF');
-        renderer.shake(30);
-        renderer.stop();
-        input.stop();
-        setGameState('victory');
-        return;
-      }
 
       // Pickup collection
       pickupManager.collect(player, applyPickupEffect);
@@ -845,6 +861,25 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
           {shields > 0 && <div>🛡️ SHIELDS: {shields}</div>}
           <div>BOMBS: {bombs}</div>
           <div>POWER: {power}</div>
+          <div style={{
+            color: charge > 30 ? '#00FFD1' : charge > 10 ? '#FFFF00' : '#FF0000',
+            position: 'relative'
+          }}>
+            ⚡ CHARGE: {charge}%
+            {charge < 30 && (
+              <div style={{
+                position: 'absolute',
+                top: '-20px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '10px',
+                color: charge > 10 ? '#FFFF00' : '#FF0000',
+                whiteSpace: 'nowrap'
+              }}>
+                {charge > 10 ? 'LOW CHARGE' : 'CRITICAL!'}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Controls Info */}

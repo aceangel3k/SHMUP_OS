@@ -19,7 +19,7 @@ export class DifficultyScaling {
         enemyDamageMultiplier: 0.7,  // 70% damage
         enemySpeedMultiplier: 0.8,   // 80% speed
         bulletSpeedMultiplier: 0.8,  // 80% bullet speed
-        waveCountMultiplier: 0.7,    // 70% enemies per wave
+        waveCountMultiplier: 2.0,    // 2x enemies per wave
         shootCooldownMultiplier: 1.5, // 50% slower shooting (1.5x cooldown)
         bossHpMultiplier: 0.7,       // 70% boss HP
         playerDamageMultiplier: 1.3, // 30% more player damage
@@ -32,7 +32,7 @@ export class DifficultyScaling {
         enemyDamageMultiplier: 1.0,
         enemySpeedMultiplier: 1.0,
         bulletSpeedMultiplier: 1.0,
-        waveCountMultiplier: 1.0,
+        waveCountMultiplier: 3.0,
         shootCooldownMultiplier: 1.0,
         bossHpMultiplier: 1.0,
         playerDamageMultiplier: 1.0,
@@ -45,7 +45,7 @@ export class DifficultyScaling {
         enemyDamageMultiplier: 1.3,  // 30% more damage
         enemySpeedMultiplier: 1.2,   // 20% faster
         bulletSpeedMultiplier: 1.2,  // 20% faster bullets
-        waveCountMultiplier: 1.3,    // 30% more enemies
+        waveCountMultiplier: 5.0,    // 5x enemies per wave
         shootCooldownMultiplier: 0.7, // 30% faster shooting
         bossHpMultiplier: 1.5,       // 50% more boss HP
         playerDamageMultiplier: 0.8, // 20% less player damage

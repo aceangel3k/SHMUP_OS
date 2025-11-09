@@ -63,13 +63,21 @@ export class CollisionManager {
   /**
    * Check collision between player bullets and enemies
    */
-  checkBulletEnemyCollisions(bulletManager, enemies) {
+  checkBulletEnemyCollisions(bulletManager, enemies, screenWidth = 800, screenHeight = 600) {
     const playerBullets = bulletManager.getPlayerBullets();
     const hits = [];
     
     for (const bullet of playerBullets) {
       for (const enemy of enemies) {
         if (!enemy.active) continue;
+        
+        // Only allow collisions within reasonable screen boundaries
+        // Use larger margin to account for enemy spawning patterns and ensure visible enemies can be hit
+        const margin = 150;
+        if (enemy.x < -margin || enemy.x > screenWidth + margin ||
+            enemy.y < -margin || enemy.y > screenHeight + margin) {
+          continue; // Skip far off-screen enemies
+        }
         
         // Use hitboxRadius for larger, easier-to-hit collision area
         const enemyHitbox = {

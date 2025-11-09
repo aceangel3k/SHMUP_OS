@@ -41,6 +41,11 @@ export class Enemy {
     this.bulletPattern = bulletPattern;
     this.shootTimer = 0;
     this.shootCooldown = (1.5 + Math.random()) * shootCooldownMultiplier; // Random cooldown 1.5-2.5s, scaled by difficulty
+    
+    // Lifetime tracking to prevent stuck enemies (more generous timeout)
+    this.maxLifetime = 45; // 45 seconds max lifetime - increased to allow natural gameplay
+    this.creationTime = Date.now();
+    this.waveCompleted = false; // Track if this enemy was from a completed wave
   }
   
   /**
@@ -70,8 +75,13 @@ export class Enemy {
       }
     }
     
-    // Deactivate if off-screen (left side)
-    if (this.x < -100) {
+    // Deactivate if off-screen (left side primarily, with generous timeout for stuck ones)
+    if (
+      this.x < -100 || // Left side - natural exit
+      this.y < -200 || // Top side (far off-screen)
+      this.y > 920 || // Bottom side (far off-screen)
+      (Date.now() - this.creationTime) > this.maxLifetime * 1000 // Timeout for truly stuck enemies
+    ) {
       this.active = false;
     }
   }
