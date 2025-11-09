@@ -253,8 +253,26 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       // Resume audio context on first user interaction
       soundSystem.resume();
       
-      // Hook up weapon sound
-      weaponSystem.onFireSound = () => soundSystem.playPlayerShoot();
+      // Hook up weapon sound with different sounds for different weapon types
+      weaponSystem.onFireSound = (weaponType) => {
+        switch (weaponType) {
+          case 'basic':
+            soundSystem.playPlayerShoot();
+            break;
+          case 'rapid':
+            soundSystem.playPlayerShoot(); // Could be different pitch
+            break;
+          case 'spread':
+          case 'triple':
+            soundSystem.playPlayerShoot(); // Could be deeper sound
+            break;
+          case 'laser':
+            soundSystem.playPlayerShoot(); // Could be laser sound
+            break;
+          default:
+            soundSystem.playPlayerShoot();
+        }
+      };
     
     // Store in ref for cleanup
     engineRef.current = { 
@@ -375,9 +393,14 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
           if (currentPower < 5) {
             currentPower++;
             setPower(currentPower);
-            weaponSystem.upgrade(currentPower);
+            soundSystem.playPickup?.();
+            
+            // Visual feedback for power-up
+            const playerPos = player.getPosition();
+            particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFF00', 20, 1.0);
+            renderer.flash(0.3, '#FFFF00');
+            console.log(`⚡ Power increased to level ${currentPower}!`);
           }
-          soundSystem.playPickup?.();
         } else if (typeof effect === 'string' && effect.startsWith('score+')) {
           const n = parseInt(effect.split('+')[1] || '0', 10);
           if (!Number.isNaN(n)) {
@@ -422,6 +445,13 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       parallax.update(deltaTime);
       player.update(deltaTime);
       weaponSystem.update(deltaTime, player, actions.fire);
+      
+      // Update weapon system when power changes
+      if (weaponSystem.currentPowerLevel !== currentPower) {
+        weaponSystem.upgrade(currentPower);
+        weaponSystem.currentPowerLevel = currentPower;
+        console.log(`🔫 Weapon upgraded to power level ${currentPower}`);
+      }
       bulletManager.update(deltaTime, GAME_CONFIG.RENDER_WIDTH, GAME_CONFIG.RENDER_HEIGHT);
       bombSystem.update(deltaTime);
       waveScheduler.update(deltaTime, player, PathFunctions, bulletPattern, bulletManager);
@@ -580,13 +610,13 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
               
               console.log('🔒 IMMEDIATE LOCK - All game updates stopped');
               
-              // Hide player and create dramatic explosion
+              // Hide player and create dramatic explosion with intense red screen
               player.active = false;
               particleSystem.createExplosion(playerPos.x, playerPos.y, '#FF0000', 50, 2.0);
               particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFF00', 40, 1.8);
               particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFFFF', 30, 1.5);
               renderer.shake(30);
-              renderer.flash(0.8, '#FF0000');
+              renderer.flash(1.5, '#FF0000'); // Intense red screen flash
               
               return;
             }
@@ -648,13 +678,13 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
               
               console.log('🔒 IMMEDIATE LOCK - All game updates stopped');
               
-              // Hide player and create dramatic explosion
+              // Hide player and create dramatic explosion with intense red screen
               player.active = false;
               particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FF0000', 50, 2.0);
               particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FFFF00', 40, 1.8);
               particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FFFFFF', 30, 1.5);
               renderer.shake(30);
-              renderer.flash(0.8, '#FF0000');
+              renderer.flash(1.5, '#FF0000'); // Intense red screen flash
               
               return;
             }

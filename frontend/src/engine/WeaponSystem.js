@@ -44,9 +44,9 @@ export class WeaponSystem {
   fire(player) {
     const pos = player.getPosition();
     
-    // Play sound effect
+    // Play sound effect based on weapon type
     if (this.onFireSound) {
-      this.onFireSound();
+      this.onFireSound(this.weaponType || 'basic');
     }
     
     if (this.bulletCount === 1) {
@@ -86,36 +86,52 @@ export class WeaponSystem {
   }
   
   /**
-   * Upgrade weapon (increase fire rate or spread)
+   * Upgrade weapon (increase fire rate, spread, and visual effects)
    */
   upgrade(level) {
     switch (level) {
       case 1:
         this.fireRate = 10;
         this.bulletCount = 1;
+        this.bulletRadius = 4;
+        this.bulletColor = '#00FFD1'; // Default cyan
+        this.weaponType = 'basic';
         break;
       case 2:
         this.fireRate = 12;
         this.bulletCount = 1;
+        this.bulletRadius = 5;
+        this.bulletColor = '#00FF00'; // Green - faster
+        this.weaponType = 'rapid';
         break;
       case 3:
         this.fireRate = 12;
         this.bulletCount = 2;
         this.spreadAngle = 10;
+        this.bulletRadius = 5;
+        this.bulletColor = '#FFFF00'; // Yellow - spread
+        this.weaponType = 'spread';
         break;
       case 4:
         this.fireRate = 15;
         this.bulletCount = 3;
         this.spreadAngle = 15;
+        this.bulletRadius = 6;
+        this.bulletColor = '#FF8000'; // Orange - triple
+        this.weaponType = 'triple';
         break;
       case 5:
         this.fireRate = 20;
         this.bulletCount = 3;
         this.spreadAngle = 20;
+        this.bulletRadius = 7;
+        this.bulletColor = '#FF0080'; // Magenta - laser
+        this.weaponType = 'laser';
         break;
     }
     
     this.fireInterval = 1 / this.fireRate;
+    this.damage = this.damage + (level - 1) * 2; // Increase damage with level
   }
   
   /**
