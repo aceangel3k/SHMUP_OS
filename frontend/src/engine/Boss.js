@@ -13,6 +13,7 @@ export class Boss {
     this.name = bossData.title || bossData.name || 'Boss';
     this.radius = bossData.radius || 40;
     this.hitboxRadius = (bossData.radius || 40) * 1.2; // Hitbox for hits (sprite is 10x, hitbox is 1.2x)
+    this.spriteRadius = this.radius * 5; // Full sprite size (10x radius, so 5x radius for half-width)
     this.spritePrompt = bossData.sprite_prompt;
     
     // Phases
@@ -51,7 +52,8 @@ export class Boss {
     // State
     this.active = true;
     this.isDead = false;
-    this.isInvulnerable = false;
+    // Start invulnerable and will be made vulnerable when warning disappears
+    this.isInvulnerable = true;
     
     // Attack timing with difficulty scaling
     this.attackCooldown = 0;
@@ -87,9 +89,8 @@ export class Boss {
         this.y += (dy / dist) * 100 * deltaTime;
       } else {
         this.isMovingToPosition = false;
-        // Boss becomes vulnerable once in position
-        this.isInvulnerable = false;
-        console.log(`👹 Boss #${this.id} is now vulnerable and ready to fight!`);
+        // Boss reached position but remains invulnerable until warning disappears
+        console.log(`👹 Boss #${this.id} reached position, waiting for warning to disappear before becoming vulnerable`);
       }
     } else {
       // Vertical panning movement when in position
@@ -393,5 +394,15 @@ export class Boss {
    */
   deactivate() {
     this.active = false;
+  }
+  
+  /**
+   * Make boss vulnerable (call when warning disappears)
+   */
+  makeVulnerable() {
+    if (this.isInvulnerable && !this.isMovingToPosition) {
+      this.isInvulnerable = false;
+      console.log(`👹 Boss #${this.id} is now vulnerable and ready to fight!`);
+    }
   }
 }

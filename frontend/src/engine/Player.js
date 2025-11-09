@@ -117,13 +117,22 @@ export class Player {
       this.renderPlaceholder(ctx);
     }
     
-    // Render hitbox in slow mode
+    // Render hitboxes in slow mode
     if (this.isSlow) {
-      ctx.strokeStyle = '#FF00D1';
+      // Render pickup hitbox (full-size) - semi-transparent cyan
+      ctx.strokeStyle = '#00D4FF';
+      ctx.fillStyle = '#00D4FF20';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, this.spriteRadius, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
+      
+      // Render damage hitbox (single pixel) - bright red dot
+      ctx.fillStyle = '#FF0000';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, 2, 0, Math.PI * 2); // Small visible dot for the single-pixel hitbox
+      ctx.fill();
     }
     
     ctx.restore();
@@ -226,6 +235,28 @@ export class Player {
       x: this.x,
       y: this.y,
       radius: this.radius,
+    };
+  }
+  
+  /**
+   * Get pickup hitbox (full-size for easier collection)
+   */
+  getPickupHitbox() {
+    return {
+      x: this.x,
+      y: this.y,
+      radius: this.spriteRadius, // Use full sprite radius for pickups
+    };
+  }
+  
+  /**
+   * Get damage hitbox (single pixel for precise gameplay)
+   */
+  getDamageHitbox() {
+    return {
+      x: this.x,
+      y: this.y,
+      radius: 0.5, // Single pixel center point
     };
   }
 }

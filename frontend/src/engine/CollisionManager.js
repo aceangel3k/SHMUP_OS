@@ -42,10 +42,10 @@ export class CollisionManager {
   }
   
   /**
-   * Check collision between player and bullets
+   * Check collision between player and bullets (uses damage hitbox - single pixel)
    */
   checkPlayerBulletCollisions(player, bulletManager) {
-    const playerHitbox = player.getHitbox();
+    const playerHitbox = player.getDamageHitbox(); // Use single-pixel damage hitbox
     const enemyBullets = bulletManager.getEnemyBullets();
     const hits = [];
     
@@ -61,7 +61,7 @@ export class CollisionManager {
   }
   
   /**
-   * Check collision between player bullets and enemies
+   * Check collision between player bullets and enemies (uses full-size hitboxes)
    */
   checkBulletEnemyCollisions(bulletManager, enemies, screenWidth = 800, screenHeight = 600) {
     const playerBullets = bulletManager.getPlayerBullets();
@@ -79,11 +79,11 @@ export class CollisionManager {
           continue; // Skip far off-screen enemies
         }
         
-        // Use hitboxRadius for larger, easier-to-hit collision area
+        // Use full-size hitbox for enemies
         const enemyHitbox = {
           x: enemy.x,
           y: enemy.y,
-          radius: enemy.hitboxRadius || enemy.radius
+          radius: enemy.spriteRadius || enemy.hitboxRadius || enemy.radius || 20
         };
         
         if (this.checkCircleCircle(bullet, enemyHitbox)) {
@@ -109,16 +109,23 @@ export class CollisionManager {
   }
   
   /**
-   * Check collision between player and enemies
+   * Check collision between player and enemies (uses damage hitbox - single pixel)
    */
   checkPlayerEnemyCollisions(player, enemies) {
-    const playerHitbox = player.getHitbox();
+    const playerHitbox = player.getDamageHitbox(); // Use single-pixel damage hitbox
     const hits = [];
     
     for (const enemy of enemies) {
       if (!enemy.active) continue;
       
-      if (this.checkCircleCircle(playerHitbox, enemy)) {
+      // Use full-size hitbox for enemies
+      const enemyHitbox = {
+        x: enemy.x,
+        y: enemy.y,
+        radius: enemy.spriteRadius || enemy.radius || enemy.hitboxRadius || 20
+      };
+      
+      if (this.checkCircleCircle(playerHitbox, enemyHitbox)) {
         hits.push(enemy);
         this.collisionCount++;
       }
@@ -132,6 +139,25 @@ export class CollisionManager {
    */
   checkBombRadius(x, y, bombX, bombY, bombRadius) {
     return this.getDistance(x, y, bombX, bombY) < bombRadius;
+  }
+  
+  /**
+   * Check collision between player and pickups (uses pickup hitbox - full-size)
+   */
+  checkPlayerPickupCollisions(player, pickups) {
+    const playerHitbox = player.getPickupHitbox(); // Use full-size pickup hitbox
+    const hits = [];
+    
+    for (const pickup of pickups) {
+      if (!pickup.active) continue;
+      
+      if (this.checkCircleCircle(playerHitbox, pickup)) {
+        hits.push(pickup);
+        this.collisionCount++;
+      }
+    }
+    
+    return hits;
   }
   
   /**

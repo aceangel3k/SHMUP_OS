@@ -57,6 +57,18 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     }
   }, [hidden]);
 
+  // Make boss vulnerable when warning disappears
+  useEffect(() => {
+    if (!showBossWarning && engineRef.current) {
+      const { waveScheduler } = engineRef.current;
+      const boss = waveScheduler?.getBoss();
+      if (boss && boss.active) {
+        boss.makeVulnerable();
+        console.log(`🚨 Boss warning disappeared - ${boss.name || 'Boss'} is now vulnerable!`);
+      }
+    }
+  }, [showBossWarning]);
+
   useEffect(() => {
     if (!gameData) return;
     
@@ -352,6 +364,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         setBossName(boss.name || 'Boss'); // Use 'Boss' as fallback for empty/unknown names
         setShowBossWarning(true);
         soundSystem.playBossWarning();
+        console.log(`🚨 Boss warning shown for ${boss.name || 'Boss'} - boss remains invulnerable until warning disappears`);
       }
       
       // Check for boss death as victory condition (only trigger once)
@@ -507,10 +520,12 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         const baseBombDps = 4000; // base DPS
         const bombDamageThisFrame = difficultyScaling.scaleBombDamage(baseBombDps) * deltaTime;
         
-        // Damage regular enemies
+        // Damage regular enemies (use full-size hitboxes)
         for (const enemy of activeEnemies) {
           const enemyPos = enemy.getPosition();
-          if (collisionManager.checkBombRadius(enemyPos.x, enemyPos.y, playerPos.x, playerPos.y, bombRadius)) {
+          const enemyRadius = enemy.spriteRadius || enemy.hitboxRadius || enemy.radius || 20;
+          const playerToEnemyDistance = collisionManager.getDistance(enemyPos.x, enemyPos.y, playerPos.x, playerPos.y);
+          if (playerToEnemyDistance < bombRadius + enemyRadius) {
             const destroyed = enemy.takeDamage(bombDamageThisFrame);
             if (destroyed) {
               currentScore += 100;
@@ -521,11 +536,13 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
           }
         }
         
-        // Damage boss
+        // Damage boss (use full-size hitbox)
         const boss = waveScheduler.getBoss();
         if (boss && boss.active) {
           const bossPos = boss.getPosition();
-          if (collisionManager.checkBombRadius(bossPos.x, bossPos.y, playerPos.x, playerPos.y, bombRadius)) {
+          const bossRadius = boss.spriteRadius || boss.hitboxRadius || boss.radius || 40;
+          const playerToBossDistance = collisionManager.getDistance(bossPos.x, bossPos.y, playerPos.x, playerPos.y);
+          if (playerToBossDistance < bombRadius + bossRadius) {
             boss.takeDamage(bombDamageThisFrame);
           }
         }
@@ -561,8 +578,12 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       }
       
 
-      // Pickup collection
-      pickupManager.collect(player, applyPickupEffect);
+      // Pickup collection (uses full-size hitbox for easier collection)
+      const collectedPickups = collisionManager.checkPlayerPickupCollisions(player, pickupManager.pickups);
+      for (const pickup of collectedPickups) {
+        pickup.active = false;
+        applyPickupEffect(pickup.effect);
+      }
       
       // Update invulnerability
       if (isInvulnerable) {

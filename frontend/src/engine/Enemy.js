@@ -13,6 +13,7 @@ export class Enemy {
     this.speed = enemyData.speed * 100; // Convert to px/s
     this.radius = enemyData.radius;
     this.hitboxRadius = enemyData.radius * 1.2; // Hitbox for hits (sprite is 11x, hitbox is 1.2x)
+    this.spriteRadius = this.radius * 5.5; // Full sprite size (11x radius, so 5.5x radius for half-width)
     this.spritePrompt = enemyData.sprite_prompt;
     
     // Position
