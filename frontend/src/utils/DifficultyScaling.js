@@ -15,38 +15,41 @@ export class DifficultyScaling {
   _getModifiersForDifficulty(difficulty) {
     const modifiers = {
       easy: {
-        enemyHpMultiplier: 0.6,      // 60% HP
-        enemyDamageMultiplier: 0.7,  // 70% damage
-        enemySpeedMultiplier: 0.8,   // 80% speed
-        bulletSpeedMultiplier: 0.8,  // 80% bullet speed
-        waveCountMultiplier: 0.7,    // 70% enemies per wave
-        shootCooldownMultiplier: 1.5, // 50% slower shooting (1.5x cooldown)
-        bossHpMultiplier: 0.7,       // 70% boss HP
-        playerDamageMultiplier: 1.3, // 30% more player damage
+        enemyHpMultiplier: 0.8,      // 80% HP
+        enemyDamageMultiplier: 0.8,  // 80% damage
+        enemySpeedMultiplier: 0.9,   // 90% speed
+        bulletSpeedMultiplier: 0.9,  // 90% bullet speed
+        waveCountMultiplier: 0.8,    // 80% enemies per wave
+        shootCooldownMultiplier: 1.3, // 30% slower shooting (1.3x cooldown)
+        bossHpMultiplier: 0.8,       // 80% boss HP
+        playerDamageMultiplier: 0.7, // 30% less player damage
+        bombDamageMultiplier: 1.2,
         startingLives: 5,            // 5 lives
         startingShields: 2,          // 2 shields
       },
       normal: {
-        enemyHpMultiplier: 1.0,
+        enemyHpMultiplier: 1.3,      // 30% more HP
         enemyDamageMultiplier: 1.0,
         enemySpeedMultiplier: 1.0,
         bulletSpeedMultiplier: 1.0,
         waveCountMultiplier: 1.0,
-        shootCooldownMultiplier: 1.0,
-        bossHpMultiplier: 1.0,
-        playerDamageMultiplier: 1.0,
+        shootCooldownMultiplier: 0.9, // 10% faster shooting
+        bossHpMultiplier: 1.3,       // 30% more boss HP
+        playerDamageMultiplier: 0.5, // 50% less player damage
+        bombDamageMultiplier: 1.0,
         startingLives: 4,            // 4 lives
         startingShields: 1,          // 1 shield
       },
       hard: {
-        enemyHpMultiplier: 1.5,      // 50% more HP
-        enemyDamageMultiplier: 1.3,  // 30% more damage
-        enemySpeedMultiplier: 1.2,   // 20% faster
-        bulletSpeedMultiplier: 1.2,  // 20% faster bullets
-        waveCountMultiplier: 1.3,    // 30% more enemies
-        shootCooldownMultiplier: 0.7, // 30% faster shooting
-        bossHpMultiplier: 1.5,       // 50% more boss HP
-        playerDamageMultiplier: 0.8, // 20% less player damage
+        enemyHpMultiplier: 2.0,      // 100% more HP (double)
+        enemyDamageMultiplier: 1.5,  // 50% more damage
+        enemySpeedMultiplier: 1.3,   // 30% faster
+        bulletSpeedMultiplier: 1.3,  // 30% faster bullets
+        waveCountMultiplier: 1.4,    // 40% more enemies
+        shootCooldownMultiplier: 0.6, // 40% faster shooting
+        bossHpMultiplier: 2.0,       // 100% more boss HP (double)
+        playerDamageMultiplier: 0.3, // 70% less player damage
+        bombDamageMultiplier: 1.0,
         startingLives: 3,            // 3 lives
         startingShields: 0,          // 0 shields
       },
@@ -109,6 +112,13 @@ export class DifficultyScaling {
    */
   scalePlayerDamage(baseDamage) {
     return Math.round(baseDamage * this.modifiers.playerDamageMultiplier);
+  }
+
+  /**
+   * Scale bomb damage (DPS)
+   */
+  scaleBombDamage(baseDps) {
+    return baseDps * (this.modifiers.bombDamageMultiplier || 1.0);
   }
 
   /**

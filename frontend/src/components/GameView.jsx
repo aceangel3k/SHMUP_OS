@@ -304,13 +304,15 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       if (bombSystem.isActiveBomb()) {
         const playerPos = player.getPosition();
         const bombRadius = bombSystem.getDamageRadius();
-        const bombDamage = 300; // Bomb damage per frame (increased from 50 to 300 for 6x damage)
+        // Bomb deals DPS and is scaled independently via DifficultyScaling
+        const baseBombDps = 4000; // base DPS
+        const bombDamageThisFrame = difficultyScaling.scaleBombDamage(baseBombDps) * deltaTime;
         
         // Damage regular enemies
         for (const enemy of activeEnemies) {
           const enemyPos = enemy.getPosition();
           if (collisionManager.checkBombRadius(enemyPos.x, enemyPos.y, playerPos.x, playerPos.y, bombRadius)) {
-            const destroyed = enemy.takeDamage(bombDamage * deltaTime);
+            const destroyed = enemy.takeDamage(bombDamageThisFrame);
             if (destroyed) {
               currentScore += 100;
               currentKills++;
@@ -325,7 +327,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         if (boss && boss.active) {
           const bossPos = boss.getPosition();
           if (collisionManager.checkBombRadius(bossPos.x, bossPos.y, playerPos.x, playerPos.y, bombRadius)) {
-            boss.takeDamage(bombDamage * deltaTime);
+            boss.takeDamage(bombDamageThisFrame);
           }
         }
       }
