@@ -52,14 +52,14 @@ export class WaveScheduler {
     for (let i = 0; i < baseWaves.length; i++) {
       const baseWave = baseWaves[i];
       
-      // First wave appears quickly, then maintain constant enemy presence
+      // First wave appears quickly, then spread out waves more
       if (i === 0) {
-        currentTime = 2; // First wave appears at 2 seconds
+        currentTime = 3; // First wave appears at 3 seconds
       } else {
-        // Calculate timing to maintain constant enemies: reduce gap for larger waves
-        const baseGap = 2 + Math.random() * 2; // 2-4 seconds base gap
+        // Calculate timing with larger gaps between waves for better pacing
+        const baseGap = 4 + Math.random() * 4; // 4-8 seconds base gap (increased from 2-4)
         const enemyDensity = difficultyScaling?.modifiers.waveCountMultiplier || 3.0;
-        const densityAdjustment = Math.max(0, (enemyDensity - 2) * 0.5); // Reduce gap for higher difficulty
+        const densityAdjustment = Math.max(0, (enemyDensity - 2) * 0.3); // Smaller adjustment for higher difficulty
         currentTime += baseGap - densityAdjustment;
       }
       
@@ -75,7 +75,7 @@ export class WaveScheduler {
         const numGroups = Math.ceil(count / groupSize);
         
         for (let g = 0; g < numGroups; g++) {
-          const groupTime = currentTime + g * 1.5; // 1.5 seconds between groups
+          const groupTime = currentTime + g * 2.0; // 2.0 seconds between groups (increased from 1.5)
           const groupCount = g < numGroups - 1 ? groupSize : count - (g * groupSize);
           
           // Vary formation for each group
@@ -115,10 +115,10 @@ export class WaveScheduler {
         console.log(`🌊 Wave ${i + 1}: ${count} enemies at time ${currentTime.toFixed(0)}`);
       }
       
-      // Add small filler waves between large groups to maintain constant enemy presence
-      if (i < baseWaves.length - 1 && Math.random() < 0.7) { // 70% chance for filler
-        const fillerTime = currentTime + 1.5 + Math.random() * 1.5; // 1.5-3 seconds after
-        const fillerCount = Math.max(2, Math.min(4, Math.round(count * 0.3))); // Small filler groups
+      // Add strategic filler waves between groups to maintain some enemy presence
+      if (i < baseWaves.length - 1 && Math.random() < 0.5) { // Reduced to 50% chance for filler
+        const fillerTime = currentTime + 2.0 + Math.random() * 2.0; // 2-4 seconds after (increased gap)
+        const fillerCount = Math.max(1, Math.min(3, Math.round(count * 0.25))); // Smaller filler groups
         
         expanded.push({
           time: Math.round(fillerTime),
@@ -166,6 +166,7 @@ export class WaveScheduler {
     
     // Clean up inactive and stuck enemies
     const beforeCount = this.enemies.length;
+    const playerPos = player.getPosition();
     
     // Remove inactive enemies and enemies that have been alive too long (potentially stuck)
     this.enemies = this.enemies.filter(enemy => {
@@ -180,9 +181,19 @@ export class WaveScheduler {
         return false;
       }
       
+      // Remove enemies that have passed the player and are no longer threats
+      const behindPlayer = enemy.x < playerPos.x - 100;
+      const offScreenLeft = enemy.x < -200; // Far off screen to the left
+      
+      if (behindPlayer && enemyAge > 5) {
+        console.log(`🧹 Removing enemy that passed player (age: ${enemyAge.toFixed(1)}s, pos: ${enemy.x.toFixed(0)},${enemy.y.toFixed(0)})`);
+        enemy.active = false;
+        return false;
+      }
+      
       // Remove enemies that are too far off-screen and not moving back
       const margin = 200;
-      const isFarOffScreen = enemy.x < -margin || enemy.x > GAME_CONFIG.RENDER_WIDTH + margin ||
+      const isFarOffScreen = offScreenLeft || enemy.x > GAME_CONFIG.RENDER_WIDTH + margin ||
                            enemy.y < -margin || enemy.y > GAME_CONFIG.RENDER_HEIGHT + margin;
       
       if (isFarOffScreen && enemyAge > 10) {
@@ -209,24 +220,40 @@ export class WaveScheduler {
       this.waveIndex >= this.waves.length &&
       !this.boss
     ) {
-      // Check if all enemies are defeated
-      const allEnemiesDefeated = this.enemies.every(e => !e.active);
-      const activeEnemyCount = this.enemies.filter(e => e.active).length;
+      // Check if all enemies are defeated OR have passed the player (no longer threats)
+      const playerPos = player.getPosition();
+      
+      // Count enemies that are still active AND haven't passed the player
+      const threateningEnemies = this.enemies.filter(e => {
+        if (!e.active) return false;
+        // Enemy is a threat if it's ahead of the player (x > player.x - 100)
+        // Or if it's within screen bounds and coming from the right/can still threaten
+        const behindPlayer = e.x < playerPos.x - 100;
+        const offScreenLeft = e.x < -200; // Far off screen to the left
+        const withinThreatRange = e.x > -150 && e.x < GAME_CONFIG.RENDER_WIDTH + 100;
+        
+        // Don't wait for enemies that have passed the player or are far off screen left
+        return !behindPlayer && !offScreenLeft && withinThreatRange;
+      });
+      
+      const threateningCount = threateningEnemies.length;
+      const allEnemiesDefeated = threateningCount === 0;
+      const totalActiveEnemies = this.enemies.filter(e => e.active).length;
       
       // Calculate time since last wave was spawned
       const lastWaveTime = this.waves.length > 0 ? this.waves[this.waves.length - 1].time : 0;
       const timeSinceLastWave = this.currentTime - lastWaveTime;
       
-      // Only spawn boss if all waves are complete AND all enemies are defeated
-      // Give a 3 second breathing room after the last enemy is defeated
-      const shouldSpawnBoss = allEnemiesDefeated && timeSinceLastWave >= 3;
+      // Only spawn boss if all waves are complete AND no threatening enemies remain
+      // Give a 5 second breathing room after the last threatening enemy is gone (increased from 3)
+      const shouldSpawnBoss = allEnemiesDefeated && timeSinceLastWave >= 5;
       
       if (!allEnemiesDefeated) {
-        console.log(`⏳ Waiting for ${activeEnemyCount} enemies to be defeated before boss spawn (all waves scheduled)`);
-      } else if (timeSinceLastWave < 3) {
-        console.log(`⏳ All enemies defeated! Waiting for boss spawn delay (${(3 - timeSinceLastWave).toFixed(1)}s remaining)`);
+        console.log(`⏳ Waiting for ${threateningCount} threatening enemies to be cleared before boss spawn (all waves scheduled, ${totalActiveEnemies} total active)`);
+      } else if (timeSinceLastWave < 5) {
+        console.log(`⏳ All threatening enemies cleared! Waiting for boss spawn delay (${(5 - timeSinceLastWave).toFixed(1)}s remaining)`);
       } else if (shouldSpawnBoss) {
-        console.log(`🏆 All waves completed and all enemies defeated! Spawning boss...`);
+        console.log(`🏆 All waves completed and all threatening enemies cleared! Spawning boss...`);
         // Enter critical section to avoid race across instances/frames
         WaveScheduler.bossSpawnInProgress = true;
 
