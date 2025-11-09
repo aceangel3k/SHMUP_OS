@@ -9,13 +9,20 @@ export default function BossWarning({ bossName, onComplete }) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    console.log('⚠️ Boss Warning mounted, will dismiss in 3 seconds');
     const timer = setTimeout(() => {
+      console.log('⚠️ Boss Warning dismissing now');
       setIsVisible(false);
-      if (onComplete) onComplete();
+      if (onComplete) {
+        onComplete();
+      }
     }, 3000); // Show for 3 seconds
 
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+    return () => {
+      console.log('⚠️ Boss Warning cleanup');
+      clearTimeout(timer);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   if (!isVisible) return null;
 

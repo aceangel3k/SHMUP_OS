@@ -13,6 +13,7 @@ import { PathFunctions } from '../engine/PathFunctions';
 import { BulletPattern } from '../engine/BulletPattern';
 import { SoundSystem } from '../engine/SoundSystem';
 import { ParticleSystem } from '../engine/ParticleSystem';
+import { PickupManager } from '../engine/PickupManager';
 import TUISkin from './TUISkin';
 import BootLog from './BootLog';
 import BossWarning from './BossWarning';
@@ -22,7 +23,14 @@ import MobileControls from './MobileControls';
 import { assetLoader } from '../utils/AssetLoader';
 import { DifficultyScaling } from '../utils/DifficultyScaling';
 
+// Global singleton guard to prevent multiple game instances
+let globalGameInstance = null;
+let globalGameRunning = false;
+let globalCleanupFn = null;
+let lastGameData = null;
+
 export default function GameView({ gameData, difficulty = 'normal', hidden, onRestart }) {
+  
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
   const [bombs, setBombs] = useState(3);
@@ -35,6 +43,11 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
   const [showBossWarning, setShowBossWarning] = useState(false);
   const [bossName, setBossName] = useState('');
   const [gameState, setGameState] = useState('playing'); // playing, game_over, victory
+  
+  // Debug game state changes
+  useEffect(() => {
+    console.log(`🎮 Game state changed to: ${gameState}`);
+  }, [gameState]);
 
   // Show boot log when component becomes visible
   useEffect(() => {
@@ -44,6 +57,22 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
   }, [hidden]);
 
   useEffect(() => {
+    if (!gameData) return;
+    
+    // Simple cleanup of any existing game instance
+    if (globalGameRunning) {
+      console.log('🛑 Stopping existing game instance');
+      if (globalCleanupFn) {
+        globalCleanupFn();
+      }
+    }
+    
+    // Set singleton lock
+    globalGameInstance = Date.now();
+    globalGameRunning = true;
+    const myInstanceId = globalGameInstance;
+    console.log(`🎮 Starting GameView instance ${myInstanceId}`);
+
     if (!canvasRef.current || !gameData) return;
 
     const canvas = canvasRef.current;
@@ -211,8 +240,15 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       const collisionManager = new CollisionManager();
       const waveScheduler = new WaveScheduler(gameDataWithSprites, enemyDataMap, difficultyScaling);
       const bulletPattern = new BulletPattern(bulletManager);
+      // Register LLM-defined bullet patterns if provided
+      try {
+        bulletPattern.registerFromDefinitions(gameData.bullet_patterns || []);
+      } catch (e) {
+        console.warn('Bullet pattern registration failed:', e);
+      }
       const soundSystem = new SoundSystem();
       const particleSystem = new ParticleSystem();
+      const pickupManager = new PickupManager();
       
       // Resume audio context on first user interaction
       soundSystem.resume();
@@ -224,7 +260,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     engineRef.current = { 
       renderer, parallax, player, input, 
       bulletManager, weaponSystem, bombSystem, collisionManager,
-      waveScheduler, bulletPattern, soundSystem, particleSystem
+      waveScheduler, bulletPattern, soundSystem, particleSystem, pickupManager
     };
     
     // Local game state with difficulty-based starting values
@@ -236,8 +272,14 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     let currentShields = difficultyScaling.modifiers.startingShields || 0;
     let isInvulnerable = false;
     let invulnerabilityTimer = 0;
+    let isDying = false;
+    let deathTimer = 0;
     let bossSpawnedFlag = false;
     let hasWon = false;
+    let isGameOver = false;
+    let gameIsLocked = false; // Immediate synchronous lock
+    
+    console.log('🔄 Game state variables initialized for new game');
     
     // Initialize UI with difficulty-based values
     setLives(currentLives);
@@ -248,6 +290,102 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     
     // Update function
     const update = (deltaTime) => {
+      // Instance check - abort if we're not the active instance
+      if (globalGameInstance !== myInstanceId) {
+        return; // Silently stop updates for inactive instances
+      }
+      
+      // Death sequence handling: allow particles to animate until timer completes (runs even when locked)
+      if (isDying) {
+        deathTimer -= deltaTime;
+        particleSystem.update(deltaTime);
+        console.log(`💀 Death timer: ${deathTimer.toFixed(1)}s remaining`);
+        if (deathTimer <= 0) {
+          isDying = false;
+          renderer.stop();
+          console.log('🔒 Setting game state to game_over');
+          setGameState('game_over');
+          // Force immediate UI update
+          setTimeout(() => setGameState('game_over'), 0);
+        }
+        return;
+      }
+      
+      // Immediate synchronous lock check - takes effect instantly (after death sequence)
+      if (gameIsLocked) return;
+      
+      // Atomic game state check - stop everything if not playing
+      if (gameState !== 'playing') return;
+      
+      // Stop ALL updates if game is over or won
+      if (isGameOver) return;
+      if (hasWon) return;
+      
+      // Check for boss spawn and victory FIRST (before any other logic)
+      const boss = waveScheduler.getBoss();
+      
+      // Boss warning on spawn (only once) - only after boss is fully settled and sprite loaded
+      if (
+        boss &&
+        !bossSpawnedFlag &&
+        boss.name &&
+        boss.active &&
+        boss.isMovingToPosition === false &&
+        (boss.spriteLoaded || boss.sprite)
+      ) {
+        bossSpawnedFlag = true;
+        setBossName(boss.name);
+        setShowBossWarning(true);
+        soundSystem.playBossWarning();
+      }
+      
+      // Check for boss death as victory condition (only trigger once)
+      if (boss && bossSpawnedFlag && boss.isDead && !boss.active && !hasWon) {
+        hasWon = true;
+        isGameOver = true; // Prevent any further collision checks
+        console.log('🎉 VICTORY - Boss defeated!');
+        
+        // Boss explosion effect
+        particleSystem.createBossExplosion(boss.x, boss.y);
+        renderer.flash(0.8, '#FFFFFF');
+        renderer.shake(30);
+        
+        // Stop game immediately
+        renderer.stop();
+        input.stop();
+        
+        // Show victory screen immediately
+        setGameState('victory');
+        
+        return; // Stop updating this frame
+      }
+      
+      // Helper: apply pickup effect
+      const applyPickupEffect = (effect) => {
+        if (!effect) return;
+        if (effect === 'shield+1') {
+          currentShields++;
+          setShields(currentShields);
+          soundSystem.playPickup?.();
+        } else if (effect === 'bomb+1') {
+          currentBombs++;
+          setBombs(currentBombs);
+          soundSystem.playPickup?.();
+        } else if (effect === 'power+1') {
+          if (currentPower < 5) {
+            currentPower++;
+            setPower(currentPower);
+            weaponSystem.upgrade(currentPower);
+          }
+          soundSystem.playPickup?.();
+        } else if (typeof effect === 'string' && effect.startsWith('score+')) {
+          const n = parseInt(effect.split('+')[1] || '0', 10);
+          if (!Number.isNaN(n)) {
+            currentScore += n;
+            setScore(currentScore);
+          }
+        }
+      };
       // Get input state
       const actions = input.getActions();
       
@@ -288,6 +426,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       bombSystem.update(deltaTime);
       waveScheduler.update(deltaTime, player, PathFunctions, bulletPattern, bulletManager);
       particleSystem.update(deltaTime);
+      pickupManager.update(deltaTime);
       
       // Create bullet trails for player bullets
       const playerBullets = bulletManager.getPlayerBullets();
@@ -352,8 +491,32 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
           currentKills++;
           setScore(currentScore);
           setKills(currentKills);
+          // Chance to drop a pickup
+          const pickupDefs = gameData.pickups || [];
+          if (pickupDefs.length > 0 && Math.random() < 0.25) {
+            const def = pickupDefs[Math.floor(Math.random() * pickupDefs.length)];
+            pickupManager.spawn(enemyPos.x, enemyPos.y, def);
+          }
         }
       }
+      
+      // Check victory immediately if boss died from bullet hit
+      const bossCheck = waveScheduler.getBoss();
+      if (bossCheck && bossSpawnedFlag && bossCheck.isDead && !bossCheck.active && !hasWon) {
+        hasWon = true;
+        isGameOver = true;
+        console.log('🎉 VICTORY - Boss defeated!');
+        particleSystem.createBossExplosion(bossCheck.x, bossCheck.y);
+        renderer.flash(0.8, '#FFFFFF');
+        renderer.shake(30);
+        renderer.stop();
+        input.stop();
+        setGameState('victory');
+        return;
+      }
+
+      // Pickup collection
+      pickupManager.collect(player, applyPickupEffect);
       
       // Update invulnerability
       if (isInvulnerable) {
@@ -364,8 +527,8 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
         }
       }
       
-      // Player-enemy collisions (player damage)
-      if (!isInvulnerable && !hasWon) {
+      // Player-enemy collisions (player damage) - process at most one hit per frame
+      if (!isInvulnerable && !hasWon && !isGameOver && !isDying && currentLives > 0) {
         const playerHits = collisionManager.checkPlayerEnemyCollisions(player, activeEnemies);
         if (playerHits.length > 0) {
           // Shield absorbs hit first
@@ -373,91 +536,142 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
             currentShields--;
             setShields(currentShields);
             console.log(`🛡️ Shield absorbed hit! Shields remaining: ${currentShields}`);
+            
+            const playerPos = player.getPosition();
+            renderer.shake(8);
+            renderer.flash(0.3, '#00D4FF');
+            soundSystem.playPickup?.();
+            particleSystem.createExplosion(playerPos.x, playerPos.y, '#00D4FF', 10, 0.6);
+            isInvulnerable = true;
+            player.setInvulnerable(true);
+            invulnerabilityTimer = 1.0; // 1 second invulnerability (shorter)
+            return; // stop further processing this frame
           } else {
             currentLives--;
             setLives(currentLives);
             console.log(`💥 Player hit! Lives remaining: ${currentLives}`);
             
+            const playerPos = player.getPosition();
+            renderer.shake(15);
+            renderer.flash(0.4, '#FF0000');
+            soundSystem.playPlayerHit();
+            particleSystem.createExplosion(playerPos.x, playerPos.y, '#FF0000', 15, 0.8);
+            
             if (currentLives <= 0) {
-              setGameState('game_over');
-              renderer.stop();
+              console.log('💀 GAME OVER - Player died from enemy collision');
+              
+              // Atomic death sequence - prevent any further updates
+              if (isDying || isGameOver || gameIsLocked) return; // Already dying, ignore
+              
+              // IMMEDIATE LOCK - stops all updates synchronously
+              gameIsLocked = true;
+              isDying = true;
+              isGameOver = true;
+              deathTimer = 2.5;
+              
+              // Zero out HUD atomically
+              currentLives = 0;
+              setLives(0);
+              currentShields = 0;
+              setShields(0);
+              
+              // Stop all game systems immediately
               input.stop();
+              
+              console.log('🔒 IMMEDIATE LOCK - All game updates stopped');
+              
+              // Hide player and create dramatic explosion
+              player.active = false;
+              particleSystem.createExplosion(playerPos.x, playerPos.y, '#FF0000', 50, 2.0);
+              particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFF00', 40, 1.8);
+              particleSystem.createExplosion(playerPos.x, playerPos.y, '#FFFFFF', 30, 1.5);
+              renderer.shake(30);
+              renderer.flash(0.8, '#FF0000');
+              
+              return;
             }
+            
+            isInvulnerable = true;
+            player.setInvulnerable(true);
+            invulnerabilityTimer = 2.0; // 2 seconds invulnerability
+            return; // stop further processing this frame
           }
-          
-          // Trigger screen shake, player flash, hit sound, and particles
-          const playerPos = player.getPosition();
-          renderer.shake(15);
-          renderer.flash(0.4, '#FF0000');
-          soundSystem.playPlayerHit();
-          particleSystem.createExplosion(playerPos.x, playerPos.y, '#FF0000', 15, 0.8);
-          isInvulnerable = true;
-          player.setInvulnerable(true);
-          invulnerabilityTimer = 2.0; // 2 seconds invulnerability
         }
       }
       
-      // Player-bullet collisions
-      if (!isInvulnerable && !hasWon) {
+      // Player-bullet collisions - process at most one hit per frame
+      if (!isInvulnerable && !hasWon && !isGameOver && !isDying && currentLives > 0) {
         const bulletHits = collisionManager.checkPlayerBulletCollisions(player, bulletManager);
         if (bulletHits.length > 0) {
-          // Shield absorbs hit first
           if (currentShields > 0) {
             currentShields--;
             setShields(currentShields);
             console.log(`🛡️ Shield absorbed hit! Shields remaining: ${currentShields}`);
+            const playerPos2 = player.getPosition();
+            renderer.shake(8);
+            renderer.flash(0.3, '#00D4FF');
+            soundSystem.playPickup?.();
+            particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#00D4FF', 10, 0.6);
+            isInvulnerable = true;
+            player.setInvulnerable(true);
+            invulnerabilityTimer = 1.0;
+            return; // stop further processing this frame
           } else {
             currentLives--;
             setLives(currentLives);
             console.log(`💥 Player hit by bullet! Lives remaining: ${currentLives}`);
-            
+            const playerPos2 = player.getPosition();
+            renderer.shake(15);
+            renderer.flash(0.4, '#FF0000');
+            soundSystem.playPlayerHit();
+            particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FF0000', 15, 0.8);
             if (currentLives <= 0) {
-              setGameState('game_over');
-              renderer.stop();
+              console.log('💀 GAME OVER - Player died from bullet collision');
+              
+              // Atomic death sequence - prevent any further updates
+              if (isDying || isGameOver || gameIsLocked) return; // Already dying, ignore
+              
+              // IMMEDIATE LOCK - stops all updates synchronously
+              gameIsLocked = true;
+              isDying = true;
+              isGameOver = true;
+              deathTimer = 2.5;
+              
+              // Zero out HUD atomically
+              currentLives = 0;
+              setLives(0);
+              currentShields = 0;
+              setShields(0);
+              
+              // Stop all game systems immediately
               input.stop();
+              
+              console.log('🔒 IMMEDIATE LOCK - All game updates stopped');
+              
+              // Hide player and create dramatic explosion
+              player.active = false;
+              particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FF0000', 50, 2.0);
+              particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FFFF00', 40, 1.8);
+              particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FFFFFF', 30, 1.5);
+              renderer.shake(30);
+              renderer.flash(0.8, '#FF0000');
+              
+              return;
             }
+            isInvulnerable = true;
+            player.setInvulnerable(true);
+            invulnerabilityTimer = 2.0;
+            return; // stop further processing this frame
           }
-          
-          // Trigger screen shake, player flash, hit sound, and particles
-          const playerPos2 = player.getPosition();
-          renderer.shake(15);
-          renderer.flash(0.4, '#FF0000');
-          soundSystem.playPlayerHit();
-          particleSystem.createExplosion(playerPos2.x, playerPos2.y, '#FF0000', 15, 0.8);
-          isInvulnerable = true;
-          player.setInvulnerable(true);
-          invulnerabilityTimer = 2.0;
         }
-      }
-      
-      // Check for boss spawn
-      const boss = waveScheduler.getBoss();
-      if (boss && !bossSpawnedFlag) {
-        bossSpawnedFlag = true;
-        setBossName(boss.name);
-        setShowBossWarning(true);
-        soundSystem.playBossWarning();
-      }
-      
-      // Check for victory
-      if (waveScheduler.isWavesComplete() && !hasWon) {
-        hasWon = true;
-        const boss = waveScheduler.getBoss();
-        if (boss) {
-          const bossPos = boss.getPosition();
-          particleSystem.createBossExplosion(bossPos.x, bossPos.y);
-          renderer.flash(0.8, '#FFFFFF');
-          renderer.shake(30);
-        }
-        setGameState('victory');
-        renderer.stop();
-        input.stop();
-        console.log('🎉 Victory!');
       }
     }; // Close update function
     
     // Render function
     const render = (ctx) => {
+      // Stop rendering game objects if game is over or won
+      // (but still render the final frame)
+      
       // Apply screen shake to all rendering
       const hasShake = renderer.applyShake();
       
@@ -467,10 +681,10 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       // Render enemies
       waveScheduler.render(ctx);
       
-      // Render bullets
+      // Render bullets (should be visible on top of enemies)
       bulletManager.render(ctx);
       
-      // Render player
+      // Render player (on top of everything)
       player.render(ctx);
       
       // Render bomb effect
@@ -479,6 +693,9 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
       
       // Render particles
       particleSystem.render(ctx);
+
+      // Render pickups
+      pickupManager.render(ctx);
       
       // Reset shake transform
       if (hasShake) {
@@ -516,11 +733,29 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
     // Start game loop
     renderer.start(update, render);
       
-      // Cleanup
-      return () => {
-        renderer.stop();
-        input.stop();
+      // Cleanup - ensure complete shutdown
+      const cleanup = () => {
+        console.log(`🧹 GameView cleanup for instance ${myInstanceId}`);
+        if (renderer) renderer.stop();
+        if (input) input.stop();
+        // Reset global boss flags
+        if (typeof WaveScheduler !== 'undefined') {
+          WaveScheduler.bossSpawnedGlobal = false;
+          WaveScheduler.bossSpawnInProgress = false;
+        }
+        // Only release lock if we're the active instance
+        if (globalGameInstance === myInstanceId) {
+          globalGameInstance = null;
+          globalGameRunning = false;
+          globalCleanupFn = null;
+          console.log(`🔓 Instance ${myInstanceId} released singleton lock`);
+        }
       };
+      
+      // Store cleanup function globally
+      globalCleanupFn = cleanup;
+      
+      return cleanup;
     }); // Close .then() block
   }, [gameData]);
 

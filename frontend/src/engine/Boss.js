@@ -4,9 +4,12 @@
  */
 
 export class Boss {
+  static nextId = 1;
+  
   constructor(bossData, x, y, shootCooldownMultiplier = 1.0) {
+    this.id = Boss.nextId++;
+    console.log(`🆔 Boss #${this.id} created`);
     // Boss data from JSON
-    this.id = bossData.id;
     this.name = bossData.title || bossData.name || 'Boss';
     this.radius = bossData.radius || 40;
     this.hitboxRadius = (bossData.radius || 40) * 1.2; // Hitbox for hits (sprite is 10x, hitbox is 1.2x)
@@ -20,6 +23,10 @@ export class Boss {
     // Calculate total HP from all phases
     this.maxHp = this.phases.reduce((total, phase) => total + (phase.hp || 0), 0);
     this.hp = this.maxHp;
+    
+    // Track HP remaining in current phase
+    this.currentPhaseHp = this.currentPhase ? this.currentPhase.hp : 0;
+    this.phaseHpRemaining = this.currentPhaseHp;
     
     // Position
     this.x = x;
@@ -173,16 +180,28 @@ export class Boss {
    * Check if should transition to next phase
    */
   checkPhaseTransition() {
-    if (!this.currentPhase) return;
+    if (!this.currentPhase || this.isDead || this.hp <= 0 || !this.active) return;
     
-    const hpPercent = this.hp / this.maxHp;
-    const phaseHpThreshold = this.currentPhase.hp_threshold || 0;
+    // Calculate how much HP was depleted from the phase pool
+    const totalPhaseHp = this.currentPhase.hp || 0;
+    const hpDepleted = this.maxHp - this.hp;
     
-    if (hpPercent <= phaseHpThreshold && this.currentPhaseIndex < this.phases.length - 1) {
+    // Calculate cumulative HP of all previous phases
+    let previousPhasesHp = 0;
+    for (let i = 0; i < this.currentPhaseIndex; i++) {
+      previousPhasesHp += this.phases[i].hp || 0;
+    }
+    
+    // Check if we've depleted the current phase's HP pool
+    const currentPhaseHpDepleted = hpDepleted - previousPhasesHp;
+    
+    if (currentPhaseHpDepleted >= totalPhaseHp && this.currentPhaseIndex < this.phases.length - 1) {
       this.currentPhaseIndex++;
       this.currentPhase = this.phases[this.currentPhaseIndex];
       this.attackCooldown = 0; // Attack immediately on phase change
-      console.log(`👹 Boss phase ${this.currentPhaseIndex + 1}: ${this.currentPhase.name}`);
+      this.currentPhaseHp = this.currentPhase.hp || 0;
+      this.phaseHpRemaining = this.currentPhaseHp;
+      console.log(`👹 Boss #${this.id} phase ${this.currentPhaseIndex + 1} activated! Patterns: ${this.currentPhase.patterns.join(', ')}`);
     }
   }
   
@@ -275,17 +294,31 @@ export class Boss {
     ctx.fillStyle = hpColor;
     ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
     
+    // Draw phase dividers
+    let cumulativeHp = 0;
+    for (let i = 0; i < this.phases.length - 1; i++) {
+      cumulativeHp += this.phases[i].hp || 0;
+      const dividerX = barX + barWidth * (1 - cumulativeHp / this.maxHp);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(dividerX, barY);
+      ctx.lineTo(dividerX, barY + barHeight);
+      ctx.stroke();
+    }
+    
     // Border
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 2;
     ctx.strokeRect(barX, barY, barWidth, barHeight);
     
-    // Boss name
+    // Boss name with phase indicator
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '14px "Courier New"';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(this.name, 1280 / 2, barY - 10);
+    const phaseText = this.phases.length > 1 ? ` [PHASE ${this.currentPhaseIndex + 1}/${this.phases.length}]` : '';
+    ctx.fillText(this.name + phaseText, 1280 / 2, barY - 10);
     
     // HP text
     ctx.textBaseline = 'middle';
@@ -296,18 +329,23 @@ export class Boss {
    * Take damage
    */
   takeDamage(damage) {
-    if (this.isInvulnerable) return false;
+    // Don't take damage if invulnerable, dead, or inactive
+    if (this.isInvulnerable || this.isDead || !this.active) return false;
     
     this.hp -= damage;
     this.damageFlash = 1.0;
     
+    // Check death FIRST before any phase logic
     if (this.hp <= 0) {
       this.hp = 0;
       this.isDead = true;
       this.active = false;
-      console.log(`👹 Boss defeated!`);
+      console.log(`👹 Boss #${this.id} defeated!`);
       return true; // Boss destroyed
     }
+    
+    // Update phase HP tracking only if alive
+    this.phaseHpRemaining -= damage;
     
     return false;
   }

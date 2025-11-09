@@ -89,6 +89,18 @@ export class BulletManager {
    * Render all active bullets
    */
   render(ctx) {
+    if (!ctx) {
+      console.error('BulletManager.render: No context provided!');
+      return;
+    }
+    
+    // Force reset context state before rendering bullets
+    ctx.globalAlpha = 1.0;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
     for (let i = 0; i < this.poolSize; i++) {
       const bullet = this.bullets[i];
       
@@ -136,15 +148,51 @@ export class BulletManager {
         ctx.arc(bullet.x, bullet.y, bullet.radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
       } else {
-        // Enemy bullets - standard rendering
-        ctx.fillStyle = bullet.color;
+        // Enemy bullets - maximum visibility with bright colors
+        // Ensure color is never too dark or transparent
+        const bulletColor = bullet.color || '#FF6B6B';
+        
+        // Large outer glow for visibility
+        ctx.shadowColor = bulletColor;
+        ctx.shadowBlur = 8;
+        ctx.fillStyle = bulletColor;
+        ctx.globalAlpha = 0.4;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.radius + 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Reset shadow
+        ctx.shadowBlur = 0;
+        
+        // Main bullet with bright color
+        ctx.globalAlpha = 1.0;
+        ctx.fillStyle = bulletColor;
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright white outline for definition
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.9;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Bright white center for maximum visibility
+        ctx.fillStyle = '#FFFFFF';
+        ctx.globalAlpha = 1.0;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.radius * 0.5, 0, Math.PI * 2);
         ctx.fill();
       }
       
       ctx.restore();
     }
+    
+    // Ensure context is fully reset after rendering all bullets
+    ctx.globalAlpha = 1.0;
+    ctx.shadowBlur = 0;
   }
   
   /**

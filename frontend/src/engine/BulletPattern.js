@@ -137,4 +137,59 @@ export class BulletPattern {
   getPattern(patternId) {
     return this.patterns[patternId];
   }
+
+  /**
+   * Register patterns from LLM game data definitions
+   * defs: Array of { id, type, bullets?, spread_deg?, arc_deg?, speed? }
+   */
+  registerFromDefinitions(defs) {
+    if (!Array.isArray(defs)) return;
+    for (const def of defs) {
+      if (!def || !def.id || !def.type) continue;
+      const id = def.id;
+      const speed = def.speed ?? 200;
+      switch (def.type) {
+        case 'fan': {
+          const bullets = Math.max(2, def.bullets ?? 3);
+          const spread = def.spread_deg ?? 30;
+          this.patterns[id] = (x, y, angle = 0, spd = speed) => this.spawnFan(bullets, spread, x, y, angle, spd);
+          break;
+        }
+        case 'burst': {
+          const bullets = Math.max(3, def.bullets ?? 16);
+          this.patterns[id] = (x, y, angle = 0, spd = speed) => this.spawnBurst(bullets, x, y, angle, spd);
+          break;
+        }
+        case 'spiral': {
+          const arms = def.dual ? 2 : 1;
+          this.patterns[id] = (x, y, angle = 0, spd = speed) => this.spawnSpiral(arms, x, y, angle, spd);
+          break;
+        }
+        case 'aimed': {
+          this.patterns[id] = (x, y, angle = 0, spd = speed, player = null) => this.spawnAimed(x, y, angle, spd, player);
+          break;
+        }
+        case 'ring': {
+          const bullets = Math.max(3, def.bullets ?? 12);
+          this.patterns[id] = (x, y, angle = 0, spd = speed) => this.spawnRing(bullets, x, y, angle, spd);
+          break;
+        }
+        case 'stream': {
+          // Stream: approximate by a narrow fan of 3 with low spread
+          const bullets = 3; const spread = 10;
+          this.patterns[id] = (x, y, angle = 0, spd = speed) => this.spawnFan(bullets, spread, x, y, angle, spd);
+          break;
+        }
+        case 'laser': {
+          // Laser fallback: fast aimed shot
+          this.patterns[id] = (x, y, angle = 0, spd = Math.max(500, speed), player = null) => this.spawnAimed(x, y, angle, spd, player);
+          break;
+        }
+        default: {
+          // Unknown type -> aimed
+          this.patterns[id] = (x, y, angle = 0, spd = speed, player = null) => this.spawnAimed(x, y, angle, spd, player);
+        }
+      }
+    }
+  }
 }
