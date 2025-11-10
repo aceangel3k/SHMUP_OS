@@ -947,7 +947,7 @@ export default function GameView({ gameData, difficulty = 'normal', hidden, onRe
 
         {/* Controls Info */}
         <div className="mt-4 mb-4 font-mono text-xs text-center" style={{ color: '#00FFD1', opacity: 0.5 }}>
-          <div>ARROWS/WASD: Move | SPACE: Fire | SHIFT: Slow | X: Bomb</div>
+          <div>ARROWS/WASD: Move | LEFT CLICK: Fire | RIGHT CLICK: Bomb | SHIFT: Slow | SPACE: Fire (alt) | X: Bomb (alt)</div>
         </div>
       </div>
 

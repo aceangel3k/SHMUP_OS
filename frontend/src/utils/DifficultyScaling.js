@@ -21,8 +21,8 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 0.8,  // 80% bullet speed
         waveCountMultiplier: 2.0,    // 2x enemies per wave
         shootCooldownMultiplier: 1.5, // 50% slower shooting (1.5x cooldown)
-        bossHpMultiplier: 15.0,      // 15x boss HP (much stronger boss for 15-20s fight)
-        playerDamageMultiplier: 1.0, // Normal player damage (easier mode already has advantage)
+        bossHpMultiplier: 20.0,      // 20x boss HP (much stronger boss for 15-20s fight)
+        playerDamageMultiplier: 0.9, // 10% less player damage (easier mode still needs some challenge)
         bombDamageMultiplier: 1.2,   // 20% more bomb damage
         startingLives: 5,            // 5 lives
         startingShields: 2,          // 2 shields
@@ -36,8 +36,8 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 1.0,
         waveCountMultiplier: 3.0,
         shootCooldownMultiplier: 1.0,
-        bossHpMultiplier: 20.0,      // 20x boss HP (epic boss for 15-20s fight)
-        playerDamageMultiplier: 0.9, // 10% less player damage
+        bossHpMultiplier: 30.0,      // 30x boss HP (epic boss for 20-25s fight)
+        playerDamageMultiplier: 0.7, // 30% less player damage (normal mode needs significant challenge)
         bombDamageMultiplier: 1.0,   // Normal bomb damage
         startingLives: 4,            // 4 lives
         startingShields: 1,          // 1 shield
@@ -51,8 +51,8 @@ export class DifficultyScaling {
         bulletSpeedMultiplier: 1.2,  // 20% faster bullets
         waveCountMultiplier: 5.0,    // 5x enemies per wave
         shootCooldownMultiplier: 0.7, // 30% faster shooting
-        bossHpMultiplier: 25.0,      // 25x boss HP (legendary boss for 20+s fight)
-        playerDamageMultiplier: 0.7, // 30% less player damage (hard mode needs significant challenge)
+        bossHpMultiplier: 50.0,      // 50x boss HP (nightmare boss for extreme challenge)
+        playerDamageMultiplier: 0.5, // 50% less player damage (extreme difficulty requiring mastery)
         bombDamageMultiplier: 1.0,   // Normal bomb damage (hard mode)
         startingLives: 3,            // 3 lives
         startingShields: 0,          // 0 shields

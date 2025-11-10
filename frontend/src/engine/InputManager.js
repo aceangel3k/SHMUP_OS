@@ -1,6 +1,6 @@
 /**
- * InputManager - Keyboard input handling
- * Maps keyboard events to game actions
+ * InputManager - Keyboard and mouse input handling
+ * Maps keyboard and mouse events to game actions
  */
 
 export class InputManager {
@@ -29,7 +29,7 @@ export class InputManager {
       'ArrowRight': 'right',
       'KeyD': 'right',
       
-      // Actions
+      // Actions (keyboard - kept for compatibility)
       'Space': 'fire',
       'KeyX': 'bomb',
       'ShiftLeft': 'slow',
@@ -40,6 +40,9 @@ export class InputManager {
     // Bind event handlers
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
+    this.handleMouseDown = this.handleMouseDown.bind(this);
+    this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handleContextMenu = this.handleContextMenu.bind(this);
   }
   
   /**
@@ -48,6 +51,9 @@ export class InputManager {
   start() {
     window.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keyup', this.handleKeyUp);
+    window.addEventListener('mousedown', this.handleMouseDown);
+    window.addEventListener('mouseup', this.handleMouseUp);
+    window.addEventListener('contextmenu', this.handleContextMenu);
   }
   
   /**
@@ -56,6 +62,9 @@ export class InputManager {
   stop() {
     window.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keyup', this.handleKeyUp);
+    window.removeEventListener('mousedown', this.handleMouseDown);
+    window.removeEventListener('mouseup', this.handleMouseUp);
+    window.removeEventListener('contextmenu', this.handleContextMenu);
   }
   
   /**
@@ -91,6 +100,52 @@ export class InputManager {
       this.actions[action] = false;
       this.keys[event.code] = false;
     }
+  }
+  
+  /**
+   * Handle mousedown event
+   */
+  handleMouseDown(event) {
+    // Left mouse button (0) = fire, Right mouse button (2) = bomb
+    if (event.button === 0) {
+      // Left click - fire
+      event.preventDefault();
+      if (!this.keys['mouse0']) {
+        this.actions.fire = true;
+        this.keys['mouse0'] = true;
+      }
+    } else if (event.button === 2) {
+      // Right click - bomb
+      event.preventDefault();
+      if (!this.keys['mouse2']) {
+        this.actions.bomb = true;
+        this.keys['mouse2'] = true;
+      }
+    }
+  }
+  
+  /**
+   * Handle mouseup event
+   */
+  handleMouseUp(event) {
+    if (event.button === 0) {
+      // Left click release - stop firing
+      event.preventDefault();
+      this.actions.fire = false;
+      this.keys['mouse0'] = false;
+    } else if (event.button === 2) {
+      // Right click release
+      event.preventDefault();
+      // Bomb remains true until reset by game logic (one-time action)
+    }
+  }
+  
+  /**
+   * Handle context menu (right click default behavior)
+   */
+  handleContextMenu(event) {
+    event.preventDefault(); // Prevent context menu on right click
+    // Bomb is handled in mousedown event
   }
   
   /**

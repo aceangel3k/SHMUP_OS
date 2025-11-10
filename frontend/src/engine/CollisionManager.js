@@ -89,18 +89,11 @@ export class CollisionManager {
         if (this.checkCircleCircle(bullet, enemyHitbox)) {
           hits.push({ bullet, enemy });
           
-          // Grow bullet on hit instead of deactivating
-          bullet.radius = Math.min(bullet.radius * 1.15, 12); // Grow by 15%, max 12
-          bullet.damage = Math.min(bullet.damage * 1.1, 50); // Increase damage by 10%, max 50
-          bullet.hitCount = (bullet.hitCount || 0) + 1;
-          
-          // Deactivate after 3 hits
-          if (bullet.hitCount >= 3) {
-            bulletManager.deactivate(bullet);
-          }
+          // Destroy bullet on first hit - no penetration
+          bulletManager.deactivate(bullet);
           
           this.collisionCount++;
-          break; // Bullet can only hit one enemy per frame
+          break; // Bullet can only hit one enemy total
         }
       }
     }

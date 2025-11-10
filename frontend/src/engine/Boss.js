@@ -63,7 +63,9 @@ export class Boss {
     
     // Shooting at player - much more aggressive for longer fights
     this.shootTimer = 0;
-    this.shootCooldown = (0.5 + Math.random() * 0.3) * shootCooldownMultiplier; // 0.5-0.8s, very fast shooting
+    // Base shooting rate gets faster with higher shootCooldownMultiplier (lower values = harder)
+    const baseShootInterval = 0.5 + Math.random() * 0.3; // 0.5-0.8s base
+    this.shootCooldown = baseShootInterval * shootCooldownMultiplier; // Scales with difficulty
     
     // Visual
     this.color = '#FF00FF'; // Magenta for boss
@@ -127,7 +129,9 @@ export class Boss {
       if (this.shootTimer >= this.shootCooldown) {
         this.shootAtPlayer(player, bulletManager);
         this.shootTimer = 0;
-        this.shootCooldown = (0.5 + Math.random() * 0.3) * this.shootCooldownMultiplier; // Very fast shooting for longer fights
+        // Difficulty-based shooting rate - harder = faster
+        const baseShootInterval = 0.5 + Math.random() * 0.3; // 0.5-0.8s base
+        this.shootCooldown = baseShootInterval * this.shootCooldownMultiplier; // Scales with difficulty
       }
     }
     
@@ -168,8 +172,19 @@ export class Boss {
     const dy = player.y - this.y;
     const angle = Math.atan2(dy, dx);
     
-    // Spawn 5 bullets in a wider spread aimed at player (more aggressive)
-    const spreadAngles = [-0.25, -0.125, 0, 0.125, 0.25];
+    // Difficulty-based bullet spread - harder = wider spread
+    let spreadAngles;
+    if (this.shootCooldownMultiplier <= 0.7) {
+      // Hard mode - 7 bullets in very wide spread
+      spreadAngles = [-0.35, -0.25, -0.15, 0, 0.15, 0.25, 0.35];
+    } else if (this.shootCooldownMultiplier <= 1.0) {
+      // Normal mode - 5 bullets in wide spread
+      spreadAngles = [-0.25, -0.125, 0, 0.125, 0.25];
+    } else {
+      // Easy mode - 3 bullets in narrow spread
+      spreadAngles = [-0.15, 0, 0.15];
+    }
+    
     for (const spread of spreadAngles) {
       const finalAngle = angle + spread;
       bulletManager.spawnEnemyBullet(
